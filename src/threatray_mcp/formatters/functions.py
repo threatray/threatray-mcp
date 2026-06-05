@@ -439,11 +439,11 @@ def format_function_diff(data: dict[str, Any], max_matches: int | None = None) -
     # function with 3 matches in the same target counts once.
     source_fns_per_target: dict[str, int] = {}
     for fn in fns_with_matches:
-        seen_targets: set[str] = set()
+        seen_here: set[str] = set()
         for m in fn.get("matches") or []:
             target_hash = m.get("hash_sha256") or ""
-            if target_hash and target_hash not in seen_targets:
-                seen_targets.add(target_hash)
+            if target_hash and target_hash not in seen_here:
+                seen_here.add(target_hash)
                 source_fns_per_target[target_hash] = source_fns_per_target.get(target_hash, 0) + 1
 
     lines.append(

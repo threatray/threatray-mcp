@@ -1,8 +1,11 @@
 """Functions section tools."""
 
+from typing import cast
+
 from fastmcp import Context, FastMCP
 
 from .. import formatters
+from ..client._types import FileHashAny, FunctionUid, SampleAnalysisId
 from ..models import (
     CodeDetectionsInput,
     DiffFunctionsInput,
@@ -35,8 +38,12 @@ def register(mcp: FastMCP) -> None:
         pagination; results may be large for complex samples.
         """
         client = get_client(ctx)
-        analysis_id = str(params.analysis_id) if params.analysis_id else None
-        result = await client.functions.list_functions(params.file_hash, analysis_id, params.pid, params.base)
+        analysis_id = (
+            SampleAnalysisId(str(params.analysis_id)) if params.analysis_id else None
+        )
+        result = await client.functions.list_functions(
+            FileHashAny(params.file_hash), analysis_id, params.pid, params.base
+        )
 
         if params.response_format == ResponseFormat.JSON:
             return format_json(result)
@@ -70,9 +77,11 @@ def register(mcp: FastMCP) -> None:
         (malware, runtime, library, application, installer, packer, ...).
         """
         client = get_client(ctx)
-        analysis_id_str = str(params.analysis_id) if params.analysis_id else None
+        analysis_id_typed = (
+            SampleAnalysisId(str(params.analysis_id)) if params.analysis_id else None
+        )
         result = await client.functions.get_code_detections(
-            params.hash_sha256, analysis_id_str, params.pid, params.base
+            FileHashAny(params.hash_sha256), analysis_id_typed, params.pid, params.base
         )
 
         if params.response_format == ResponseFormat.JSON:
@@ -107,7 +116,9 @@ def register(mcp: FastMCP) -> None:
         sharing specific functionality, and identifying code reuse patterns.
         """
         client = get_client(ctx)
-        result = await client.functions.run_retrohunt(params.function_uids, params.threshold, params.scope)
+        result = await client.functions.run_retrohunt(
+            cast("list[FunctionUid]", params.function_uids), params.threshold, params.scope
+        )
 
         if params.response_format == ResponseFormat.JSON:
             return format_json(result)
@@ -161,8 +172,8 @@ def register(mcp: FastMCP) -> None:
         """
         client = get_client(ctx)
         result = await client.functions.diff(
-            source_hash=params.source_hash,
-            target_hashes=params.target_hashes,
+            source_hash=FileHashAny(params.source_hash),
+            target_hashes=cast("list[FileHashAny]", params.target_hashes),
             with_benign_code=params.with_benign_code,
             threshold=params.threshold,
         )

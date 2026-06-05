@@ -1,8 +1,11 @@
 """Submissions section tools — list, get, the submit-* family, and task lookups."""
 
+from typing import cast
+
 from fastmcp import Context, FastMCP
 
 from .. import formatters
+from ..client._types import FileHashAny, SampleAnalysisId, SubmissionId, TaskId
 from ..models import (
     ResponseFormat,
     SubmissionsInput,
@@ -50,7 +53,7 @@ def register(mcp: FastMCP) -> None:
         environment, timing). Useful for tracking an in-flight submission.
         """
         client = get_client(ctx)
-        result = await client.submissions.get_task(params.task_id)
+        result = await client.submissions.get_task(TaskId(params.task_id))
         if params.response_format == ResponseFormat.JSON:
             return format_json(result)
         return formatters.format_task(result)
@@ -62,7 +65,7 @@ def register(mcp: FastMCP) -> None:
     async def threatray_get_task_by_analysis(ctx: Context, params: TaskByAnalysisInput) -> str:
         """Get the task that produced a given analysis ID."""
         client = get_client(ctx)
-        result = await client.submissions.get_task_by_analysis(str(params.analysis_id))
+        result = await client.submissions.get_task_by_analysis(SampleAnalysisId(str(params.analysis_id)))
         if params.response_format == ResponseFormat.JSON:
             return format_json(result)
         return formatters.format_task(result)
@@ -80,8 +83,8 @@ def register(mcp: FastMCP) -> None:
         """
         client = get_client(ctx)
         result = await client.submissions.list_tasks(
-            file_hash=params.file_hash,
-            submission_id=str(params.submission_id) if params.submission_id else None,
+            file_hash=cast("FileHashAny | None", params.file_hash),
+            submission_id=SubmissionId(str(params.submission_id)) if params.submission_id else None,
             limit=params.limit,
         )
         if params.response_format == ResponseFormat.JSON:

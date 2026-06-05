@@ -485,7 +485,7 @@ def _root_domain(url: str) -> str:
     return ".".join(parts[-2:])
 
 
-def _report_sort_key(rep: dict[str, Any]) -> tuple[int, int, str, str]:
+def _report_sort_key(rep: dict[str, Any]) -> tuple[int, int, int, str, str]:
     """UI sort: (low-grade-domain rank, has-undated-date flag, -pub_date, title).
 
     Mirrors `sortReports` in samples-reports.component.ts:
@@ -502,7 +502,7 @@ def _report_sort_key(rep: dict[str, Any]) -> tuple[int, int, str, str]:
     # Dated reports come before undated; within dated, newer first (negate by
     # inverting per-char compare via a `~` reversed string isn't trivial here;
     # use a (dated_first, neg_date) pair).
-    return (low_grade_tier[0], low_grade_tier[1], 0 if date else 1, _negate_date(date), rep.get("title") or "")
+    return (low_grade_tier[0], low_grade_tier[1], 0 if date else 1, _negate_date(date), str(rep.get("title") or ""))
 
 
 def _negate_date(date: str) -> str:
@@ -702,7 +702,7 @@ def _format_analysis_table(
     for a in analyses:
         cells = []
         for _, key in columns:
-            value = a
+            value: Any = a
             for part in key.split("."):
                 if not isinstance(value, dict):
                     value = None

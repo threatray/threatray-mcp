@@ -3,6 +3,7 @@
 from fastmcp import Context, FastMCP
 
 from .. import formatters
+from ..client._types import FileHashSha256
 from ..formatters.capa import capa_addresses_overflow
 from ..models import CapaInput, ResponseFormat
 from ._cache import format_with_cache
@@ -46,7 +47,7 @@ def register(mcp: FastMCP) -> None:
             await ctx.report_progress(int(progress * 100), 100, message)
 
         result = await client.capa.get(
-            params.file_hash,
+            FileHashSha256(params.file_hash),
             trigger_if_missing=params.trigger_if_missing,
             trigger_only=params.trigger_only,
             progress_callback=progress_callback,

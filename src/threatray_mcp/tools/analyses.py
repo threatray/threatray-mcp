@@ -1,8 +1,11 @@
 """Analyses section tools."""
 
+from typing import cast
+
 from fastmcp import Context, FastMCP
 
 from .. import formatters
+from ..client._types import FileHashAny, IsoDateTime, SampleAnalysisId
 from ..formatters.analyses import osint_reports_overflow
 from ..models import (
     AnalysesListInput,
@@ -44,7 +47,7 @@ def register(mcp: FastMCP) -> None:
         picks which analysis to return).
         """
         client = get_client(ctx)
-        result = await client.analyses.get(str(params.analysis_id))
+        result = await client.analyses.get(SampleAnalysisId(str(params.analysis_id)))
         if params.response_format == ResponseFormat.JSON:
             return format_json(result)
         return formatters.format_analysis_details(result)
@@ -65,7 +68,7 @@ def register(mcp: FastMCP) -> None:
         Accepts md5, sha1, or sha256.
         """
         client = get_client(ctx)
-        result = await client.analyses.osint(params.hash)
+        result = await client.analyses.osint(FileHashAny(params.hash))
         if params.response_format == ResponseFormat.JSON:
             return format_json(result)
         summary = formatters.format_osint_report(result)
@@ -98,8 +101,8 @@ def register(mcp: FastMCP) -> None:
         client = get_client(ctx)
         result = await client.analyses.list_samples(
             verdicts=params.verdicts,
-            from_finished_at=params.from_finished_at,
-            to_finished_at=params.to_finished_at,
+            from_finished_at=cast("IsoDateTime | None", params.from_finished_at),
+            to_finished_at=cast("IsoDateTime | None", params.to_finished_at),
             limit=params.limit,
             cursor=params.cursor,
         )
@@ -124,8 +127,8 @@ def register(mcp: FastMCP) -> None:
         client = get_client(ctx)
         result = await client.analyses.list_endpoint_scans(
             verdicts=params.verdicts,
-            from_finished_at=params.from_finished_at,
-            to_finished_at=params.to_finished_at,
+            from_finished_at=cast("IsoDateTime | None", params.from_finished_at),
+            to_finished_at=cast("IsoDateTime | None", params.to_finished_at),
             limit=params.limit,
             cursor=params.cursor,
         )
