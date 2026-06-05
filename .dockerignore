@@ -1,0 +1,49 @@
+# Build-context hygiene: keep the build small and avoid pulling local
+# dev-tree artifacts into the image (the runtime stage already only copies
+# the venv, but the `base` stage's build context still sees the project
+# root, so trim it here too).
+
+# VCS
+.git
+.gitignore
+.gitattributes
+
+# CI / repo metadata that the image doesn't need
+.github
+.azure
+.dockerignore
+Dockerfile*
+docker-compose*.yml
+Makefile
+CHANGELOG.md
+README.md.bak
+
+# IDE / editor state
+.idea
+.vscode
+*.swp
+*.swo
+
+# Python caches
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Test + coverage artifacts
+.coverage
+htmlcov
+tests/coverage
+
+# Local virtualenvs (separate from /app/venv built inside the image)
+.venv
+venv
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Local Claude Code state
+.claude

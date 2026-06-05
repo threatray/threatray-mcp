@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "threatray": {
+      "command": "uvx",
+      "args": ["threatray-mcp"],
+      "env": {
+        "THREATRAY_API_KEY": "YOUR_API_KEY_HERE",
+        "THREATRAY_API_URL": "https://api-<your-realm>.analysis.threatray.com"
+      }
+    }
+  }
+}
