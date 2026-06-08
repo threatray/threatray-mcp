@@ -70,4 +70,4 @@ jobs:
         with:
           name: dist
           path: dist/
-      - uses: pypa/gh-action-pypi-publish@6733eb7d741f0b11ec6a39b58540dab7590f9b7d # v1.14.0
+      - uses: pypa/gh-action-pypi-publish@v1.14.0  # Docker action: version-tag pin (ghcr image is tagged by version, not commit SHA — @<sha> has no image)
