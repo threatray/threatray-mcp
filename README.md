@@ -6,12 +6,12 @@ MCP server for the [Threatray](https://www.threatray.com) malware analysis and t
 
 ## Quick start
 
-Requires a Threatray API key and Python 3.11+. Install from a local checkout (PyPI release is pending — once it lands the same commands work via `uvx threatray-mcp`):
+Requires a Threatray API key and Python 3.11+. Install from PyPI:
 
 ```bash
-git clone https://github.com/threatray/threatray-mcp
-cd threatray-mcp
-pip install .
+uvx threatray-mcp        # run directly, no install
+# or
+pip install threatray-mcp
 ```
 
 ### Claude Code
