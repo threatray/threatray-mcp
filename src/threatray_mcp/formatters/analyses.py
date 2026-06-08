@@ -263,7 +263,10 @@ def _render_process(proc: dict[str, Any]) -> list[str]:
     cmdline = proc.get("command_line", "")
     out = [f"#### PID {pid} (parent {ppid}): `{name}` — {status}, {verdict}"]
     if cmdline:
-        out.append(f"- **Command line**: `{cmdline}`")
+        # Command lines are fully attacker-controlled; collapse newlines so a
+        # crafted one can't break out of the list item.
+        one_line = str(cmdline).replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+        out.append(f"- **Command line**: `{one_line}`")
     threats = proc.get("threats") or []
     if threats:
         out.append(f"- **Threats**: {_threats(threats)}")
@@ -302,10 +305,15 @@ def _extract_ioc_value(ioc: Any) -> str:
     mutexes use `mutex`, registry uses `registry_key`."""
     if not isinstance(ioc, dict):
         return str(ioc)
+    raw = str(ioc)
     for key in ("filename", "registry_key", "domain", "ip", "url", "mutex", "name", "value", "path", "key"):
         if key in ioc:
-            return str(ioc[key])
-    return str(ioc)
+            raw = str(ioc[key])
+            break
+    # Collapse newlines: IOC values (registry keys, file paths, URLs) are
+    # sample-derived and routinely multi-line; a newline would break the
+    # list item it's rendered into.
+    return raw.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
 
 
 def format_analysis_details(data: dict[str, Any]) -> str:  # noqa: PLR0912, PLR0915

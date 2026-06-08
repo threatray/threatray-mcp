@@ -4,6 +4,29 @@ from datetime import datetime, timezone
 from typing import Any
 
 
+def escape_cell(value: Any) -> str:
+    """Escape a value for safe inclusion in a markdown table cell.
+
+    Cells interpolate adversarial, sample-derived data (file names, extracted
+    strings, constants, IOC values). A literal `|` injects a column; a newline
+    terminates the row and corrupts every row below it — and malware strings /
+    IOCs routinely contain both. Escape `|` and collapse newlines so a crafted
+    sample can't forge or break the rendered table.
+
+    `None` renders as `-` (callers usually pass already-defaulted text, but
+    this keeps the helper safe to wrap around raw values too).
+    """
+    if value is None:
+        return "-"
+    return (
+        str(value)
+        .replace("|", "\\|")
+        .replace("\r\n", " ")
+        .replace("\n", " ")
+        .replace("\r", " ")
+    )
+
+
 def format_threats(threats_raw: list) -> str:
     """Render a threats list (strings or dicts) as a comma-separated string."""
     if not threats_raw:

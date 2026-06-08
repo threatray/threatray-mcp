@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from ._helpers import format_timestamp
+from ._helpers import escape_cell, format_timestamp
 
 
 def format_submissions_list(data: dict[str, Any], limit: int = 50) -> str:
@@ -31,7 +31,7 @@ def format_submissions_list(data: dict[str, Any], limit: int = 50) -> str:
         url_block = s.get("url") or {}
         sha256 = sample.get("hash_sha256", "")
         scope = analysis.get("scope") or sample.get("scope") or "-"
-        target = sample.get("file_name") or url_block.get("url") or (sha256 if sha256 else "-")
+        target = escape_cell(sample.get("file_name") or url_block.get("url") or (sha256 if sha256 else "-"))
         sample_link = f"`{sha256}`" if sha256 else target
         submitter = s.get("username") or "-"
         created = format_timestamp(s.get("created_at"))
@@ -80,7 +80,7 @@ def format_submission_response(data: dict[str, Any]) -> str:
         sample = s.get("sample") or {}
         url_block = s.get("url") or {}
         sha256 = sample.get("hash_sha256", "")
-        target = sample.get("file_name") or url_block.get("url") or "-"
+        target = escape_cell(sample.get("file_name") or url_block.get("url") or "-")
         lines.append(
             f"| `{task_id}` | `{submission_id}` | `{analysis_id}` | {status} "
             f"| {f'`{sha256}`' if sha256 else '-'} | {target} |"
@@ -198,7 +198,7 @@ def format_tasks_list(data: dict[str, Any], limit: int | None = None) -> str:
         scope = analysis.get("scope") or sample.get("scope") or "-"
         verdict = _verdict_str(analysis.get("verdict") or sample.get("verdict"))
         threats = _threats_str(analysis.get("threats") or sample.get("threats"))
-        target = sample.get("file_name") or url_block.get("url") or sample.get("hash_sha256") or "-"
+        target = escape_cell(sample.get("file_name") or url_block.get("url") or sample.get("hash_sha256") or "-")
         submitter = t.get("username") or "-"
         created = format_timestamp(t.get("created_at"))
         lines.append(

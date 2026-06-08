@@ -10,6 +10,7 @@ LLM sees at every viewing level.
 import atexit
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -55,11 +56,20 @@ atexit.register(_cleanup_session_files)
 
 def _save_to_cache(content: str, prefix: str) -> Path:
     RESULT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    # Restrict to the owner — the spill holds malware-derived intel under a
+    # shared cache root (~/.cache).
+    try:
+        os.chmod(RESULT_CACHE_DIR, 0o700)
+    except OSError:
+        pass
     _cleanup_old_cache_files()
 
-    filename = f"{prefix}_{int(time.time())}{CACHE_FILE_SUFFIX}"
-    filepath = RESULT_CACHE_DIR / filename
-    filepath.write_text(content)
+    # mkstemp: unique name (no collision between same-prefix spills) and the
+    # file is created 0o600 so the content isn't world-readable.
+    fd, path_str = tempfile.mkstemp(dir=RESULT_CACHE_DIR, prefix=f"{prefix}_", suffix=CACHE_FILE_SUFFIX)
+    with os.fdopen(fd, "w") as fh:
+        fh.write(content)
+    filepath = Path(path_str)
     _session_cache_files.append(filepath)
     return filepath
 

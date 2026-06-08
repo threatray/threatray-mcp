@@ -108,3 +108,14 @@ class TestFormatAiAnalysisDetail(unittest.TestCase):
         result = format_ai_analysis(data)
         assert_that(result, contains_string("AI Analysis (summary)"))
         assert_that(result, contains_string("get_ai_analysis_by_id"))
+
+
+class TestZeroFunctionsAnalysed(unittest.TestCase):
+    def test_zero_functions_renders_zero_not_question_mark(self):
+        # 0 functions analysed is a real result, not "unknown" — render 0, not ?.
+        result = format_ai_analysis(
+            {"functions_analyzed": 0, "functions_decompiled": 0,
+             "created_at": "2026-05-20T09:55:06Z"}
+        )
+        assert_that(result, contains_string("0 analysed"))
+        self.assertNotIn("? analysed", result)

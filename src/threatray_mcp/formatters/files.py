@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from ._helpers import format_timestamp
+from ._helpers import escape_cell, format_timestamp
 
 _MAX_RESOURCES_SHOWN = 15
 _MAX_STRINGS_MARKDOWN = 200
@@ -48,7 +48,7 @@ def format_file_metadata(data: dict[str, Any]) -> str:  # noqa: PLR0912, PLR0915
         lines.append(f"- **MD5**: `{md5}`")
     if magic := data.get("magic"):
         lines.append(f"- **Magic**: {magic}")
-    if size := data.get("size"):
+    if (size := data.get("size")) is not None:
         lines.append(f"- **Size**: {size} bytes")
     if first_seen := data.get("first_seen"):
         lines.append(f"- **First seen**: {format_timestamp(first_seen)}")
@@ -111,7 +111,7 @@ def format_file_metadata(data: dict[str, Any]) -> str:  # noqa: PLR0912, PLR0915
         lines.append("|------|----------------|-------------|---------------|")
         for s in sections:
             lines.append(
-                f"| {s.get('Name', '-')} | {_fmt_hex(s.get('VirtualAddress'))} "
+                f"| {escape_cell(s.get('Name', '-'))} | {_fmt_hex(s.get('VirtualAddress'))} "
                 f"| {s.get('VirtualSize', '-')} | {s.get('SizeOfRawData', '-')} |"
             )
         lines.append("")
@@ -209,7 +209,11 @@ def format_strings_list(
         capped = strings
         lines = [f"## Strings ({received})\n"]
     for s in capped:
-        lines.append(f"- `{s}`")
+        # Collapse newlines so a multi-line extracted string can't break the
+        # list item (and everything below it). Rendered inside a code span,
+        # so `|` is already literal — only newlines are a corruption vector.
+        one_line = str(s).replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+        lines.append(f"- `{one_line}`")
     if max_strings is not None and received > max_strings:
         lines.append(
             "\n*Full markdown saved to disk (see pointer below) — or re-call "
