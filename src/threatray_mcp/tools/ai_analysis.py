@@ -3,6 +3,7 @@
 from fastmcp import Context, FastMCP
 
 from .. import formatters
+from ..client._types import AiAnalysisId, FileHashSha256
 from ..models import (
     AiAnalysisByIdInput,
     AiAnalysisInput,
@@ -47,7 +48,7 @@ def register(mcp: FastMCP) -> None:
             await ctx.report_progress(int(progress * 100), 100, message)
 
         result = await client.ai_analysis.get(
-            params.file_hash,
+            FileHashSha256(params.file_hash),
             trigger_if_missing=params.trigger_if_missing,
             trigger_only=params.trigger_only,
             max_wait_seconds=params.max_wait_seconds,
@@ -65,7 +66,7 @@ def register(mcp: FastMCP) -> None:
             and "functions" not in result
             and (rid := result.get("id"))
         ):
-            result = await client.ai_analysis.get_result_by_id(str(rid))
+            result = await client.ai_analysis.get_result_by_id(AiAnalysisId(str(rid)))
 
         if params.response_format == ResponseFormat.JSON:
             return format_json(result)
@@ -90,7 +91,7 @@ def register(mcp: FastMCP) -> None:
         run.
         """
         client = get_client(ctx)
-        result = await client.ai_analysis.list_results(params.file_hash)
+        result = await client.ai_analysis.list_results(FileHashSha256(params.file_hash))
         if params.response_format == ResponseFormat.JSON:
             return format_json(result)
         return formatters.format_ai_analysis_list(result)
@@ -108,7 +109,7 @@ def register(mcp: FastMCP) -> None:
         verdict) without re-listing.
         """
         client = get_client(ctx)
-        result = await client.ai_analysis.get_result_by_id(str(params.analysis_id))
+        result = await client.ai_analysis.get_result_by_id(AiAnalysisId(str(params.analysis_id)))
         if params.response_format == ResponseFormat.JSON:
             return format_json(result)
         return formatters.format_ai_analysis(result)
@@ -126,7 +127,7 @@ def register(mcp: FastMCP) -> None:
         or `SKIPPED`).
         """
         client = get_client(ctx)
-        result = await client.ai_analysis.get_latest_job(params.file_hash)
+        result = await client.ai_analysis.get_latest_job(FileHashSha256(params.file_hash))
         if params.response_format == ResponseFormat.JSON:
             return format_json(result)
         return formatters.format_ai_analysis(result)

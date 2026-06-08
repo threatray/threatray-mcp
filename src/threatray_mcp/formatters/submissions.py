@@ -91,7 +91,7 @@ def format_submission_response(data: dict[str, Any]) -> str:
 
 def _verdict_str(v: Any) -> str:
     if isinstance(v, dict):
-        return v.get("label", v.get("value", "-"))
+        return str(v.get("label") or v.get("value") or "-")
     return str(v) if v is not None else "-"
 
 

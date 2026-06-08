@@ -57,7 +57,8 @@ class AiAnalysisClient:
             raise ThreatrayFeatureUnavailable("AI analysis is not enabled for this account.") from e
 
         if results.get("results"):
-            return results["results"][0]
+            first: dict[str, Any] = results["results"][0]
+            return first
         if not trigger_if_missing:
             raise ThreatrayNotFound("No AI analysis results found for this file.")
 
@@ -81,7 +82,8 @@ class AiAnalysisClient:
             await progress_callback(0.95, "Fetching results...")
         results = await self._http.get("/v1/ai-analysis/results", params={"file_hash": file_hash})
         if results.get("results"):
-            return results["results"][0]
+            final: dict[str, Any] = results["results"][0]
+            return final
         raise ThreatrayJobFailed("AI analysis completed but no results were returned.")
 
     async def list_results(self, file_hash: FileHashSha256) -> dict[str, Any]:

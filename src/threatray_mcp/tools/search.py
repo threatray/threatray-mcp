@@ -1,8 +1,11 @@
 """Search section tools."""
 
+from typing import cast
+
 from fastmcp import Context, FastMCP
 
 from .. import formatters
+from ..client._types import DateRange, FileHashAny
 from ..formatters.search import aggregations_overflow
 from ..models import ResponseFormat, RetrohuntSampleInput, SearchInput
 from ._cache import format_with_cache
@@ -57,7 +60,9 @@ def register(mcp: FastMCP) -> None:
         API response.
         """
         client = get_client(ctx)
-        result = await client.search.run(params.query, params.max_results, params.scope, params.date)
+        result = await client.search.run(
+            params.query, params.max_results, params.scope, cast("DateRange | None", params.date)
+        )
         analyses = result.get("analyses", [])
         item_count = len(analyses)
 
@@ -99,7 +104,10 @@ def register(mcp: FastMCP) -> None:
         """
         client = get_client(ctx)
         result = await client.search.retrohunt_sample(
-            params.sample_hash, params.max_results, params.scope, params.date
+            FileHashAny(params.sample_hash),
+            params.max_results,
+            params.scope,
+            cast("DateRange | None", params.date),
         )
 
         if params.response_format == ResponseFormat.JSON:
