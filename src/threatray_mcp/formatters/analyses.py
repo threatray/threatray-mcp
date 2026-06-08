@@ -3,7 +3,7 @@
 from typing import Any
 from urllib.parse import urlparse
 
-from ._helpers import format_timestamp
+from ._helpers import collapse_newlines, format_timestamp
 
 _MAX_MEMORY_REGIONS_PER_PROCESS = 5
 
@@ -257,7 +257,10 @@ def _render_verdict_details(verdict_details: dict[str, Any]) -> list[str]:
 def _render_process(proc: dict[str, Any]) -> list[str]:
     pid = proc.get("pid", "?")
     ppid = proc.get("ppid", "?")
-    name = proc.get("name", "?")
+    # argv[0]/image name is attacker-controlled (an ELF sample can execve with
+    # an arbitrary, newline-containing argv[0]); collapse so it can't forge a
+    # second `#### PID …` heading in the process tree.
+    name = collapse_newlines(proc.get("name", "?"))
     status = proc.get("status", "?")
     verdict = proc.get("verdict", "-")
     cmdline = proc.get("command_line", "")
@@ -265,8 +268,7 @@ def _render_process(proc: dict[str, Any]) -> list[str]:
     if cmdline:
         # Command lines are fully attacker-controlled; collapse newlines so a
         # crafted one can't break out of the list item.
-        one_line = str(cmdline).replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
-        out.append(f"- **Command line**: `{one_line}`")
+        out.append(f"- **Command line**: `{collapse_newlines(cmdline)}`")
     threats = proc.get("threats") or []
     if threats:
         out.append(f"- **Threats**: {_threats(threats)}")
@@ -277,7 +279,9 @@ def _render_process(proc: dict[str, Any]) -> list[str]:
             base = r.get("base")
             size = r.get("size")
             rtype = r.get("type", "?")
-            image = r.get("image", "")
+            # Mapped/injected module path — sample-influenceable; collapse so it
+            # can't break out of the list item.
+            image = collapse_newlines(r.get("image", "")) if r.get("image") else ""
             sha = r.get("hash_sha256", "")
             r_verdict = r.get("verdict", "-")
             base_str = f"0x{base:x}" if isinstance(base, int) else "?"
@@ -313,7 +317,7 @@ def _extract_ioc_value(ioc: Any) -> str:
     # Collapse newlines: IOC values (registry keys, file paths, URLs) are
     # sample-derived and routinely multi-line; a newline would break the
     # list item it's rendered into.
-    return raw.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+    return collapse_newlines(raw)
 
 
 def format_analysis_details(data: dict[str, Any]) -> str:  # noqa: PLR0912, PLR0915

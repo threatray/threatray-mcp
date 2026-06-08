@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from ._helpers import escape_cell, format_timestamp
+from ._helpers import collapse_newlines, escape_cell, format_timestamp
 
 _MAX_RESOURCES_SHOWN = 15
 _MAX_STRINGS_MARKDOWN = 200
@@ -47,7 +47,7 @@ def format_file_metadata(data: dict[str, Any]) -> str:  # noqa: PLR0912, PLR0915
     if md5 := data.get("hash_md5"):
         lines.append(f"- **MD5**: `{md5}`")
     if magic := data.get("magic"):
-        lines.append(f"- **Magic**: {magic}")
+        lines.append(f"- **Magic**: {collapse_newlines(magic)}")
     if (size := data.get("size")) is not None:
         lines.append(f"- **Size**: {size} bytes")
     if first_seen := data.get("first_seen"):
@@ -120,12 +120,12 @@ def format_file_metadata(data: dict[str, Any]) -> str:  # noqa: PLR0912, PLR0915
     if imports := data.get("imports", []):
         lines.append(f"### Imports ({len(imports)} DLLs)")
         for imp in imports:
-            dll = imp.get("DLL") or imp.get("dll") or "?"
+            dll = collapse_newlines(imp.get("DLL") or imp.get("dll") or "?")
             functions = imp.get("functions") or []
             lines.append(f"- **{dll}**" + (f" ({len(functions)} functions)" if functions else ""))
             for fn in functions[:5]:
                 fn_name = fn.get("name") if isinstance(fn, dict) else fn
-                lines.append(f"  - `{fn_name}`")
+                lines.append(f"  - `{collapse_newlines(fn_name)}`")
             if len(functions) > 5:
                 lines.append(f"  *… and {len(functions) - 5} more*")
         lines.append("")
@@ -135,7 +135,7 @@ def format_file_metadata(data: dict[str, Any]) -> str:  # noqa: PLR0912, PLR0915
         lines.append(f"### Exports ({len(exports)})")
         for e in exports[:10]:
             name = e.get("name") if isinstance(e, dict) else e
-            lines.append(f"- `{name}`")
+            lines.append(f"- `{collapse_newlines(name)}`")
         if len(exports) > 10:
             lines.append(f"  *… and {len(exports) - 10} more*")
         lines.append("")
@@ -144,8 +144,8 @@ def format_file_metadata(data: dict[str, Any]) -> str:  # noqa: PLR0912, PLR0915
     if resources := data.get("resources", []):
         lines.append(f"### Resources ({len(resources)})")
         for r in resources[:_MAX_RESOURCES_SHOWN]:
-            name = r.get("name", "?")
-            mag = r.get("magic", "")
+            name = collapse_newlines(r.get("name", "?"))
+            mag = collapse_newlines(r.get("magic", "")) if r.get("magic") else ""
             lines.append(f"- `{name}`" + (f" — {mag}" if mag else ""))
         if len(resources) > _MAX_RESOURCES_SHOWN:
             lines.append(f"  *… and {len(resources) - _MAX_RESOURCES_SHOWN} more*")
@@ -172,7 +172,15 @@ def format_file_metadata(data: dict[str, Any]) -> str:  # noqa: PLR0912, PLR0915
         if flat:
             lines.append("### Version info")
             for vi in flat:
-                pairs = [f"{k}={v}" for k, v in vi.items() if v is not None]
+                # Keys and values are arbitrary author-chosen UTF-16 strings
+                # (CompanyName, FileDescription, …). Collapse newlines so a
+                # crafted version block can't inject markdown lines into the
+                # agent-facing metadata view.
+                pairs = [
+                    f"{collapse_newlines(k)}={collapse_newlines(v)}"
+                    for k, v in vi.items()
+                    if v is not None
+                ]
                 lines.append(f"- {'; '.join(pairs)}")
             lines.append("")
 
@@ -212,8 +220,7 @@ def format_strings_list(
         # Collapse newlines so a multi-line extracted string can't break the
         # list item (and everything below it). Rendered inside a code span,
         # so `|` is already literal — only newlines are a corruption vector.
-        one_line = str(s).replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
-        lines.append(f"- `{one_line}`")
+        lines.append(f"- `{collapse_newlines(s)}`")
     if max_strings is not None and received > max_strings:
         lines.append(
             "\n*Full markdown saved to disk (see pointer below) — or re-call "

@@ -4,6 +4,25 @@ from datetime import datetime, timezone
 from typing import Any
 
 
+def collapse_newlines(value: Any) -> str:
+    """Collapse CR/LF in a sample-derived value to single spaces.
+
+    The single place the newline-collapse policy lives. Used for values
+    rendered into list items, headings, bold runs, or code spans — contexts
+    where `|` is already literal but a newline would terminate the line and
+    let a crafted sample inject arbitrary markdown below it (version info,
+    import/export/resource names, process names, IOC values, …).
+
+    For markdown *table cells* use `escape_cell`, which also escapes `|`.
+    """
+    return (
+        str(value)
+        .replace("\r\n", " ")
+        .replace("\n", " ")
+        .replace("\r", " ")
+    )
+
+
 def escape_cell(value: Any) -> str:
     """Escape a value for safe inclusion in a markdown table cell.
 
@@ -18,13 +37,7 @@ def escape_cell(value: Any) -> str:
     """
     if value is None:
         return "-"
-    return (
-        str(value)
-        .replace("|", "\\|")
-        .replace("\r\n", " ")
-        .replace("\n", " ")
-        .replace("\r", " ")
-    )
+    return collapse_newlines(value).replace("|", "\\|")
 
 
 def format_threats(threats_raw: list) -> str:
