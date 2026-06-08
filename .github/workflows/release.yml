@@ -45,22 +45,22 @@ jobs:
 
   # Trusted-publishing to PyPI — runs only after the GH release exists, so
   # release notes are visible before the package goes live.
-  # publish-pypi:
-  #   needs: build
-  #   runs-on: ubuntu-latest
-  #   environment:
-  #     name: pypi
-  #     url: https://pypi.org/p/threatray-mcp
-  #   permissions:
-  #     id-token: write
-  #   steps:
-  #     - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
-  #       with:
-  #         egress-policy: audit
-  #     - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-  #     - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-  #       with:
-  #         python-version: "3.13"
-  #     - run: pip install build
-  #     - run: python -m build
-  #     - uses: pypa/gh-action-pypi-publish@release/v1
+  publish-pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/threatray-mcp
+    permissions:
+      id-token: write
+    steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13"
+      - run: pip install build
+      - run: python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1
