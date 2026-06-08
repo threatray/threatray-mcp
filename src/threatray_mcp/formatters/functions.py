@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from ._helpers import format_timestamp
+from ._helpers import escape_cell, format_timestamp
 
 _MAX_MATCHES_PER_FN = 15
 _MAX_RETROHUNT_FUNCTIONS_TO_SHOW = 20
@@ -93,8 +93,8 @@ def format_functions_list(data: dict[str, Any], max_functions: int | None = None
     lines.append("|---------|------|-----|-----------|-----------|")
     for f in display_functions:
         di = f.get("disassembly_info") or {}
-        api_calls = _join_strings(di.get("api_calls") or f.get("api_calls") or []) or "-"
-        constants = _join_strings(di.get("constants") or f.get("constants") or []) or "-"
+        api_calls = escape_cell(_join_strings(di.get("api_calls") or f.get("api_calls") or []) or "-")
+        constants = escape_cell(_join_strings(di.get("constants") or f.get("constants") or []) or "-")
         size = di.get("size") if di.get("size") is not None else f.get("size", "-")
         lines.append(
             f"| `{_fmt_addr(f.get('address'))}` | {size} | `{f.get('uid', '-')}` "

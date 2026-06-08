@@ -34,9 +34,6 @@ class AiAnalysisClient:
             extra_terminal_failures=_AI_TERMINAL_FAILURES,
         )
 
-    async def get_job(self, job_id: str | int) -> dict[str, Any]:
-        return await self._http.get(f"/v1/ai-analysis/jobs/{job_id}")
-
     async def _create_job(self, file_hash: FileHashSha256) -> dict[str, Any]:
         return await self._http.post("/v1/ai-analysis/jobs", {"file_hash": file_hash})
 

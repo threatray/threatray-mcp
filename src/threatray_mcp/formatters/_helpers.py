@@ -4,6 +4,42 @@ from datetime import datetime, timezone
 from typing import Any
 
 
+def collapse_newlines(value: Any) -> str:
+    """Collapse CR/LF in a sample-derived value to single spaces.
+
+    The single place the newline-collapse policy lives. Used for values
+    rendered into list items, headings, bold runs, or code spans — contexts
+    where `|` is already literal but a newline would terminate the line and
+    let a crafted sample inject arbitrary markdown below it (version info,
+    import/export/resource names, process names, IOC values, …).
+
+    For markdown *table cells* use `escape_cell`, which also escapes `|`.
+    """
+    return (
+        str(value)
+        .replace("\r\n", " ")
+        .replace("\n", " ")
+        .replace("\r", " ")
+    )
+
+
+def escape_cell(value: Any) -> str:
+    """Escape a value for safe inclusion in a markdown table cell.
+
+    Cells interpolate adversarial, sample-derived data (file names, extracted
+    strings, constants, IOC values). A literal `|` injects a column; a newline
+    terminates the row and corrupts every row below it — and malware strings /
+    IOCs routinely contain both. Escape `|` and collapse newlines so a crafted
+    sample can't forge or break the rendered table.
+
+    `None` renders as `-` (callers usually pass already-defaulted text, but
+    this keeps the helper safe to wrap around raw values too).
+    """
+    if value is None:
+        return "-"
+    return collapse_newlines(value).replace("|", "\\|")
+
+
 def format_threats(threats_raw: list) -> str:
     """Render a threats list (strings or dicts) as a comma-separated string."""
     if not threats_raw:

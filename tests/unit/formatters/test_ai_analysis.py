@@ -3,7 +3,7 @@ job-status, list entry, full detail) plus the listing endpoint."""
 
 import unittest
 
-from hamcrest import assert_that, contains_string
+from hamcrest import assert_that, contains_string, is_not
 
 from tests.dummies import DUMMY_AI_ANALYSIS_ID, DUMMY_SHA256
 from threatray_mcp.formatters import format_ai_analysis, format_ai_analysis_list
@@ -108,3 +108,14 @@ class TestFormatAiAnalysisDetail(unittest.TestCase):
         result = format_ai_analysis(data)
         assert_that(result, contains_string("AI Analysis (summary)"))
         assert_that(result, contains_string("get_ai_analysis_by_id"))
+
+
+class TestZeroFunctionsAnalysed(unittest.TestCase):
+    def test_zero_functions_renders_zero_not_question_mark(self):
+        # 0 functions analysed is a real result, not "unknown" — render 0, not ?.
+        result = format_ai_analysis(
+            {"functions_analyzed": 0, "functions_decompiled": 0,
+             "created_at": "2026-05-20T09:55:06Z"}
+        )
+        assert_that(result, contains_string("0 analysed"))
+        assert_that(result, is_not(contains_string("? analysed")))

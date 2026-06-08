@@ -1,6 +1,7 @@
 """Tests for the markdown spill-to-disk cache."""
 
 import os
+import stat
 import tempfile
 import unittest
 
@@ -86,6 +87,35 @@ class TestFormatWithCache(unittest.TestCase):
         cache_files = list(_cache.RESULT_CACHE_DIR.glob("search_*.md"))
         self.assertEqual(len(cache_files), 1)
         self.assertEqual(cache_files[0].read_text(), "# Full with all 100 rules")
+
+
+class TestCacheHardening(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._orig_dir = _cache.RESULT_CACHE_DIR
+        _cache.RESULT_CACHE_DIR = type(_cache.RESULT_CACHE_DIR)(self._tmp.name)
+        _cache._session_cache_files.clear()
+
+    def tearDown(self):
+        _cache.RESULT_CACHE_DIR = self._orig_dir
+        self._tmp.cleanup()
+
+    def test_two_spills_same_prefix_do_not_collide(self):
+        # Same prefix written back-to-back (same wall-clock second) must NOT
+        # overwrite each other — each spill gets a unique file.
+        p1 = _cache._save_to_cache("content one", "search")
+        p2 = _cache._save_to_cache("content two", "search")
+        self.assertNotEqual(p1, p2)
+        self.assertEqual(p1.read_text(), "content one")
+        self.assertEqual(p2.read_text(), "content two")
+
+    def test_spill_file_is_owner_only(self):
+        p = _cache._save_to_cache("secret intel", "test")
+        self.assertEqual(stat.S_IMODE(p.stat().st_mode), 0o600)
+
+    def test_cache_dir_is_owner_only(self):
+        _cache._save_to_cache("x", "test")
+        self.assertEqual(stat.S_IMODE(_cache.RESULT_CACHE_DIR.stat().st_mode), 0o700)
 
 
 if __name__ == "__main__":

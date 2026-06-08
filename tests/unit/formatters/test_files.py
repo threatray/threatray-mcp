@@ -174,3 +174,11 @@ class TestFormatStringsList(unittest.TestCase):
         """Defensive — payload without a `strings` key renders as empty."""
         result = format_strings_list({})
         assert_that(result, contains_string("Strings (0)"))
+
+
+class TestZeroByteFile(unittest.TestCase):
+    def test_zero_byte_file_renders_size_not_hidden(self):
+        # size=0 is a legitimate value (0-byte file); it must render, not be
+        # dropped by a falsy check.
+        out = format_file_metadata({"hash_sha256": DUMMY_SHA256, "size": 0})
+        assert_that(out, contains_string("0 bytes"))

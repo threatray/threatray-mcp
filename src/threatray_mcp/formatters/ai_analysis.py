@@ -72,7 +72,8 @@ def format_ai_analysis(data: dict[str, Any]) -> str:
     decompiled = data.get("functions_decompiled")
     if analyzed is not None or decompiled is not None:
         lines.append(
-            f"- **Functions**: {analyzed or '?'} analysed / {decompiled or '?'} decompiled"
+            f"- **Functions**: {analyzed if analyzed is not None else '?'} analysed "
+            f"/ {decompiled if decompiled is not None else '?'} decompiled"
         )
 
     if assessment := data.get("assessment"):

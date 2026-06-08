@@ -3,7 +3,7 @@
 from typing import Any
 from urllib.parse import urlparse
 
-from ._helpers import format_timestamp
+from ._helpers import collapse_newlines, format_timestamp
 
 _MAX_MEMORY_REGIONS_PER_PROCESS = 5
 
@@ -257,13 +257,18 @@ def _render_verdict_details(verdict_details: dict[str, Any]) -> list[str]:
 def _render_process(proc: dict[str, Any]) -> list[str]:
     pid = proc.get("pid", "?")
     ppid = proc.get("ppid", "?")
-    name = proc.get("name", "?")
+    # argv[0]/image name is attacker-controlled (an ELF sample can execve with
+    # an arbitrary, newline-containing argv[0]); collapse so it can't forge a
+    # second `#### PID …` heading in the process tree.
+    name = collapse_newlines(proc.get("name", "?"))
     status = proc.get("status", "?")
     verdict = proc.get("verdict", "-")
     cmdline = proc.get("command_line", "")
     out = [f"#### PID {pid} (parent {ppid}): `{name}` — {status}, {verdict}"]
     if cmdline:
-        out.append(f"- **Command line**: `{cmdline}`")
+        # Command lines are fully attacker-controlled; collapse newlines so a
+        # crafted one can't break out of the list item.
+        out.append(f"- **Command line**: `{collapse_newlines(cmdline)}`")
     threats = proc.get("threats") or []
     if threats:
         out.append(f"- **Threats**: {_threats(threats)}")
@@ -274,7 +279,9 @@ def _render_process(proc: dict[str, Any]) -> list[str]:
             base = r.get("base")
             size = r.get("size")
             rtype = r.get("type", "?")
-            image = r.get("image", "")
+            # Mapped/injected module path — sample-influenceable; collapse so it
+            # can't break out of the list item.
+            image = collapse_newlines(r.get("image", "")) if r.get("image") else ""
             sha = r.get("hash_sha256", "")
             r_verdict = r.get("verdict", "-")
             base_str = f"0x{base:x}" if isinstance(base, int) else "?"
@@ -302,10 +309,15 @@ def _extract_ioc_value(ioc: Any) -> str:
     mutexes use `mutex`, registry uses `registry_key`."""
     if not isinstance(ioc, dict):
         return str(ioc)
+    raw = str(ioc)
     for key in ("filename", "registry_key", "domain", "ip", "url", "mutex", "name", "value", "path", "key"):
         if key in ioc:
-            return str(ioc[key])
-    return str(ioc)
+            raw = str(ioc[key])
+            break
+    # Collapse newlines: IOC values (registry keys, file paths, URLs) are
+    # sample-derived and routinely multi-line; a newline would break the
+    # list item it's rendered into.
+    return collapse_newlines(raw)
 
 
 def format_analysis_details(data: dict[str, Any]) -> str:  # noqa: PLR0912, PLR0915

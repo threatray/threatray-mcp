@@ -130,11 +130,3 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
         respx.get(f"{API_BASE}/v1/ai-analysis/jobs/latest").mock(return_value=httpx.Response(404))
         with self.assertRaises(ThreatrayNotFound):
             await self.client.get_latest_job(SHA)
-
-    @respx.mock
-    async def test_get_job_by_id(self):
-        respx.get(f"{API_BASE}/v1/ai-analysis/jobs/j-1").mock(
-            return_value=httpx.Response(200, json={"job_id": "j-1", "job_status": "PROCESSING"})
-        )
-        result = await self.client.get_job("j-1")
-        self.assertEqual(result["job_status"], "PROCESSING")

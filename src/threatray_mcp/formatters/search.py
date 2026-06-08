@@ -77,7 +77,7 @@ def _yara_match_count(verdict_details: dict[str, Any]) -> int:
     return len(yara) if isinstance(yara, list) else 0
 
 
-def _analysis_link(sha256: str, analysis_id: str) -> str:
+def _analysis_link(analysis_id: str) -> str:
     """Render the analysis ID as a plain backtick-wrapped code span."""
     return f"`{analysis_id}`" if analysis_id else "`?`"
 
@@ -124,7 +124,7 @@ def _analyses_table(display: list[dict[str, Any]], heading: str) -> list[str]:
         threats = format_threats(a.get("threats", []))
         yara_count = _yara_match_count(a.get("verdict_details", {}))
         lines.append(
-            f"| {_analysis_link(sha256, analysis_id)} | "
+            f"| {_analysis_link(analysis_id)} | "
             f"{f'`{sha256}`' if sha256 else '`?`'} | "
             f"{first_seen} | {_scope_cell(a)} | {_osint_cell(a)} | "
             f"{verdict} | {threats} | {yara_count} |"
@@ -193,7 +193,7 @@ def _retrohunt_table(display: list[dict[str, Any]], code_regions: list[dict[str,
         yara_count = _yara_match_count(a.get("verdict_details", {}))
         code_match = _format_code_match(a, regions_by_aid.get(analysis_id))
         lines.append(
-            f"| {_analysis_link(sha256, analysis_id)} | "
+            f"| {_analysis_link(analysis_id)} | "
             f"{f'`{sha256}`' if sha256 else '`?`'} | "
             f"{first_seen} | {_scope_cell(a)} | {_osint_cell(a)} | "
             f"{verdict} | {threats} | {yara_count} | {code_match} |"
