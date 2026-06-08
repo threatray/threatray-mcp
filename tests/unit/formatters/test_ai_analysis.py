@@ -3,7 +3,7 @@ job-status, list entry, full detail) plus the listing endpoint."""
 
 import unittest
 
-from hamcrest import assert_that, contains_string
+from hamcrest import assert_that, contains_string, is_not
 
 from tests.dummies import DUMMY_AI_ANALYSIS_ID, DUMMY_SHA256
 from threatray_mcp.formatters import format_ai_analysis, format_ai_analysis_list
@@ -118,4 +118,4 @@ class TestZeroFunctionsAnalysed(unittest.TestCase):
              "created_at": "2026-05-20T09:55:06Z"}
         )
         assert_that(result, contains_string("0 analysed"))
-        self.assertNotIn("? analysed", result)
+        assert_that(result, is_not(contains_string("? analysed")))
