@@ -40,8 +40,4 @@ COPY . /app/
 
 WORKDIR /app
 
-# Declarative only — the default port for the optional HTTP transport
-# (THREATRAY_TRANSPORT=http). stdio (the default) ignores it.
-EXPOSE 8000
-
 CMD ["python", "-m", "threatray_mcp"]

@@ -6,9 +6,6 @@ All notable changes to `threatray-mcp` are documented here. Format follows
 
 ## [1.0.3] — 2026-06-09
 
-### Added
-- `Dockerfile` `EXPOSE 8000` — the default port for the optional HTTP transport.
-
 ### Changed
 - `Development Status` classifier → `5 - Production/Stable` (matches the 1.0 line).
 
