@@ -6,9 +6,6 @@ All notable changes to `threatray-mcp` are documented here. Format follows
 
 ## [1.0.1] — 2026-06-09
 
-> First public release. `1.0.0` is intentionally skipped: its tag was reserved
-> by GitHub immutable releases during release setup and cannot be reused.
-
 ### Overview
 
 `threatray-mcp` is a Model Context Protocol server for the Threatray malware
