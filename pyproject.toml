@@ -1,6 +1,6 @@
 [project]
 name = "threatray-mcp"
-version = "1.0.2"
+version = "1.0.3"
 description = "MCP server for the Threatray malware analysis and threat intelligence platform"
 authors = [{name = "Threatray", email = "operations@threatray.com"}]
 readme = "README.md"
@@ -8,7 +8,7 @@ requires-python = ">=3.11,<3.14"
 license = "MIT"
 keywords = ["mcp", "threatray", "malware", "threat-intelligence", "yara", "capa", "ioc"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Information Technology",
     "License :: OSI Approved :: MIT License",
