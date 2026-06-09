@@ -1,0 +1,27 @@
+name: Test publish (TestPyPI)
+
+# Manual dry-run of the trusted-publishing flow against TestPyPI. No tag and no
+# GitHub release are created, so it never consumes a real version (immutable
+# releases). Mirrors the prod publish step (uv publish + OIDC) but points at
+# TestPyPI's upload + token-mint endpoints.
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  testpypi:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # OIDC token for PyPI trusted publishing
+    steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - name: Build wheel + sdist
+        run: uv build
+      - name: Publish to TestPyPI (trusted publishing)
+        run: uv publish --publish-url https://test.pypi.org/legacy/ --trusted-publishing always dist/*
