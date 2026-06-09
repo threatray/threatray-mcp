@@ -1,6 +1,6 @@
 # threatray-mcp
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/threatray/threatray-mcp/blob/main/LICENSE)
 
 MCP server for the [Threatray](https://www.threatray.com) malware analysis and threat intelligence platform. Lets MCP-aware clients (Claude Code, Claude Desktop, Cursor, Cline, Windsurf, …) query samples, run code-similarity retrohunts, fetch CAPA capabilities, pull AI analyses, and aggregate IOCs through a single uniform tool surface.
 
@@ -46,7 +46,7 @@ Most MCP-aware editors accept the same JSON shape. Drop this block into the rele
 }
 ```
 
-A copy of this snippet is in [`examples/mcp-config.json`](examples/mcp-config.json).
+A copy of this snippet is in [`examples/mcp-config.json`](https://github.com/threatray/threatray-mcp/blob/main/examples/mcp-config.json).
 
 | Client | Config file |
 |---|---|
@@ -81,7 +81,7 @@ Two transports are supported:
 
 ## Tools
 
-Grouped by [Threatray public API taxonomy](https://docs.threatray.com/reference/overview-api). All 28 tools below; see [`src/threatray_mcp/README.md`](src/threatray_mcp/README.md) for per-tool descriptions.
+Grouped by [Threatray public API taxonomy](https://docs.threatray.com/reference/overview-api). All 28 tools below; see [`src/threatray_mcp/README.md`](https://github.com/threatray/threatray-mcp/blob/main/src/threatray_mcp/README.md) for per-tool descriptions.
 
 | Section | Tools |
 |---|---|
@@ -145,8 +145,8 @@ make type-check
 python -m unittest discover tests
 ```
 
-For contributor-facing architecture and the per-section package layout, see [`src/threatray_mcp/README.md`](src/threatray_mcp/README.md). Release notes live in [CHANGELOG.md](CHANGELOG.md).
+For contributor-facing architecture and the per-section package layout, see [`src/threatray_mcp/README.md`](https://github.com/threatray/threatray-mcp/blob/main/src/threatray_mcp/README.md). Release notes live in [CHANGELOG.md](https://github.com/threatray/threatray-mcp/blob/main/CHANGELOG.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/threatray/threatray-mcp/blob/main/LICENSE).

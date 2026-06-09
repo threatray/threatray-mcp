@@ -4,6 +4,15 @@ All notable changes to `threatray-mcp` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] — 2026-06-09
+
+### Changed
+- `Development Status` classifier → `5 - Production/Stable` (matches the 1.0 line).
+
+### Fixed
+- README links are now absolute so they resolve on the PyPI project page
+  (relative links don't resolve there).
+
 ## [1.0.2] — 2026-06-09
 
 ### Overview
