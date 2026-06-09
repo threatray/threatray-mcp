@@ -70,4 +70,10 @@ jobs:
         with:
           name: dist
           path: dist/
-      - uses: pypa/gh-action-pypi-publish@v1.14.0  # Docker action: version-tag pin (ghcr image is tagged by version, not commit SHA — @<sha> has no image)
+      # `uv publish` over `pypa/gh-action-pypi-publish`: that action is a Docker
+      # action whose ghcr image is tagged by `github.action_ref`, so a
+      # commit-SHA pin resolves to a non-existent image tag — incompatible with
+      # the org "actions must be pinned to a full-length SHA" policy. uv has
+      # built-in OIDC trusted publishing and setup-uv SHA-pins cleanly.
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - run: uv publish --trusted-publishing always dist/*
