@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/threatray/threatray-mcp/blob/main/LICENSE)
 
-MCP server for the [Threatray](https://www.threatray.com) malware analysis and threat intelligence platform. Lets MCP-aware clients (Claude Code, Claude Desktop, Cursor, Cline, Windsurf, …) query samples, run code-similarity retrohunts, fetch CAPA capabilities, pull AI analyses, and aggregate IOCs through a single uniform tool surface.
+MCP server for the [Threatray](https://www.threatray.com) malware intelligence platform. Lets MCP-aware clients (Claude Code, Claude Desktop, Cursor, Cline, Windsurf, …) query samples, run code-similarity retrohunts, fetch CAPA capabilities, pull AI analyses, and aggregate IOCs through a single uniform tool surface.
 
 ## Quick start
 
