@@ -75,5 +75,5 @@ jobs:
       # commit-SHA pin resolves to a non-existent image tag — incompatible with
       # the org "actions must be pinned to a full-length SHA" policy. uv has
       # built-in OIDC trusted publishing and setup-uv SHA-pins cleanly.
-      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
       - run: uv publish --trusted-publishing always dist/*
