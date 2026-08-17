@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from ..ai_analysis_status import format_ai_analysis_job_progress
 from ..errors import (
     ThreatrayFeatureUnavailable,
     ThreatrayJobFailed,
@@ -19,13 +20,18 @@ from ._types import AiAnalysisId, FileHashSha256, ProgressCallback
 _AI_TERMINAL_FAILURES = (JobStatus.UNSUPPORTED.value, JobStatus.SKIPPED.value)
 
 
+class _AiAnalysisJobPoller(JobPoller):
+    def _format_progress_message(self, job: dict[str, Any]) -> str:
+        return format_ai_analysis_job_progress(job)
+
+
 class AiAnalysisClient:
     def __init__(self, http: HttpClient, poll_interval: int = 10):
         self._http = http
         self._poll_interval = poll_interval
 
     def _build_poller(self, timeout: int) -> JobPoller:
-        return JobPoller(
+        return _AiAnalysisJobPoller(
             self._http,
             "/v1/ai-analysis",
             "AI analysis",
@@ -74,9 +80,11 @@ class AiAnalysisClient:
         if progress_callback:
             await progress_callback(0.3, "Job created, waiting for completion...")
         poller = self._build_poller(max_wait_seconds)
-        await poller.poll(job["job_id"], progress_callback)
+        completed_job = await poller.poll(job["job_id"], progress_callback)
         if progress_callback:
             await progress_callback(0.95, "Fetching results...")
+        if result_id := completed_job.get("result_id"):
+            return await self.get_result_by_id(AiAnalysisId(str(result_id)))
         results = await self._http.get("/v1/ai-analysis/results", params={"file_hash": file_hash})
         if results.get("results"):
             final: dict[str, Any] = results["results"][0]

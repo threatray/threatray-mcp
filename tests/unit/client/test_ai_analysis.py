@@ -14,6 +14,7 @@ from threatray_mcp.errors import ThreatrayFeatureUnavailable, ThreatrayNotFound
 API_BASE = "https://api.threatray.test"
 SHA = "f" * 64
 
+
 class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.async_client = httpx.AsyncClient()
@@ -39,9 +40,7 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
 
     @respx.mock
     async def test_get_empty_results_without_trigger_raises_not_found(self):
-        respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
-            return_value=httpx.Response(200, json={"results": []})
-        )
+        respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(return_value=httpx.Response(200, json={"results": []}))
         with self.assertRaises(ThreatrayNotFound):
             await self.client.get(SHA, trigger_if_missing=False)
 
@@ -60,7 +59,30 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, {"results": [{"id": "x"}]})
 
     @respx.mock
-    async def test_trigger_flow_creates_polls_and_fetches(self):
+    async def test_trigger_flow_fetches_exact_completed_result(self):
+        result_id = "00000000-0000-0000-0000-000000000001"
+        results_route = respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
+            return_value=httpx.Response(200, json={"results": []})
+        )
+        respx.post(f"{API_BASE}/v1/ai-analysis/jobs").mock(
+            return_value=httpx.Response(200, json={"job_id": "j1", "job_status": "QUEUED"})
+        )
+        respx.get(f"{API_BASE}/v1/ai-analysis/jobs/j1").mock(
+            return_value=httpx.Response(
+                200,
+                json={"job_id": "j1", "job_status": "DONE", "result_id": result_id},
+            )
+        )
+        result_route = respx.get(f"{API_BASE}/v1/ai-analysis/results/{result_id}").mock(
+            return_value=httpx.Response(200, json={"id": result_id, "assessment": "fresh"})
+        )
+        result = await self.client.get(SHA, trigger_if_missing=True, max_wait_seconds=30)
+        self.assertEqual(result["id"], result_id)
+        self.assertEqual(results_route.call_count, 1)
+        self.assertEqual(result_route.call_count, 1)
+
+    @respx.mock
+    async def test_trigger_flow_falls_back_to_listing_for_legacy_job_shape(self):
         respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
             side_effect=[
                 httpx.Response(200, json={"results": []}),
@@ -73,15 +95,58 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
         respx.get(f"{API_BASE}/v1/ai-analysis/jobs/j1").mock(
             return_value=httpx.Response(200, json={"job_id": "j1", "job_status": "DONE"})
         )
+
         result = await self.client.get(SHA, trigger_if_missing=True, max_wait_seconds=30)
+
         self.assertEqual(result["id"], "fresh")
+
+    @respx.mock
+    async def test_trigger_flow_reports_server_owned_stage_and_eta(self):
+        respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
+            side_effect=[
+                httpx.Response(200, json={"results": []}),
+                httpx.Response(200, json={"results": [{"id": "fresh"}]}),
+            ]
+        )
+        respx.post(f"{API_BASE}/v1/ai-analysis/jobs").mock(
+            return_value=httpx.Response(200, json={"job_id": "j1", "job_status": "QUEUED"})
+        )
+        respx.get(f"{API_BASE}/v1/ai-analysis/jobs/j1").mock(
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json={
+                        "job_id": "j1",
+                        "job_status": "PROCESSING",
+                        "stage": "ANALYZING",
+                        "started_at": "2026-08-17T10:00:00Z",
+                        "remaining_time_estimate": {
+                            "minimum_seconds": 42,
+                            "maximum_seconds": 96,
+                        },
+                    },
+                ),
+                httpx.Response(200, json={"job_id": "j1", "job_status": "DONE"}),
+            ]
+        )
+        messages: list[str] = []
+
+        async def progress_callback(_progress: float, message: str) -> None:
+            messages.append(message)
+
+        await self.client.get(
+            SHA,
+            trigger_if_missing=True,
+            max_wait_seconds=30,
+            progress_callback=progress_callback,
+        )
+
+        self.assertTrue(any("AI review" in message and "about 40s-2m remaining" in message for message in messages))
 
     @respx.mock
     async def test_trigger_only_returns_job_without_polling(self):
         """trigger_only=True: enqueue the job, return immediately, no /jobs/{id} call."""
-        respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
-            return_value=httpx.Response(200, json={"results": []})
-        )
+        respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(return_value=httpx.Response(200, json={"results": []}))
         post_route = respx.post(f"{API_BASE}/v1/ai-analysis/jobs").mock(
             return_value=httpx.Response(200, json={"job_id": "j1", "job_status": "QUEUED"})
         )
@@ -95,9 +160,7 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
     async def test_create_job_posts_only_file_hash(self):
         """function_addresses + max_functions are not exposed to agents; the
         client must not leak them onto the POST body either."""
-        respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
-            return_value=httpx.Response(200, json={"results": []})
-        )
+        respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(return_value=httpx.Response(200, json={"results": []}))
         post_route = respx.post(f"{API_BASE}/v1/ai-analysis/jobs").mock(
             return_value=httpx.Response(200, json={"job_id": "j1", "job_status": "QUEUED"})
         )

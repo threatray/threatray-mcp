@@ -2,6 +2,7 @@
 job-status, list entry, full detail) plus the listing endpoint."""
 
 import unittest
+from datetime import datetime, timedelta, timezone
 
 from hamcrest import assert_that, contains_string, is_not
 
@@ -86,14 +87,39 @@ class TestFormatAiAnalysisDetail(unittest.TestCase):
 
     def test_latest_job_shape(self):
         """`/v1/ai-analysis/jobs/latest` returns the job dict directly."""
+        started_at = datetime.now(timezone.utc) - timedelta(seconds=90)
         data = {
             "job_id": "job-1",
             "file_hash": DUMMY_SHA256,
             "job_status": "PROCESSING",
+            "created_at": "2026-08-17T09:58:00Z",
+            "started_at": started_at.isoformat(),
+            "stage": "DECOMPILING",
+            "remaining_time_estimate": {
+                "minimum_seconds": 84,
+                "maximum_seconds": 399,
+            },
         }
         result = format_ai_analysis(data)
         assert_that(result, contains_string("AI Analysis Job"))
         assert_that(result, contains_string("PROCESSING"))
+        assert_that(result, contains_string("Decompiling code"))
+        assert_that(result, contains_string("Elapsed"))
+        assert_that(result, contains_string("about 1m-7m remaining"))
+
+    def test_latest_completed_job_includes_exact_result_id_without_live_elapsed(self):
+        data = {
+            "job_id": "job-1",
+            "file_hash": DUMMY_SHA256,
+            "job_status": "DONE",
+            "started_at": "2026-08-17T09:58:00Z",
+            "result_id": DUMMY_AI_ANALYSIS_ID,
+        }
+
+        result = format_ai_analysis(data)
+
+        assert_that(result, contains_string(DUMMY_AI_ANALYSIS_ID))
+        assert_that(result, is_not(contains_string("Elapsed")))
 
     def test_listing_summary_shape(self):
         """`results[i]` from `/v1/ai-analysis/results` is shorter — no
@@ -114,8 +140,7 @@ class TestZeroFunctionsAnalysed(unittest.TestCase):
     def test_zero_functions_renders_zero_not_question_mark(self):
         # 0 functions analysed is a real result, not "unknown" — render 0, not ?.
         result = format_ai_analysis(
-            {"functions_analyzed": 0, "functions_decompiled": 0,
-             "created_at": "2026-05-20T09:55:06Z"}
+            {"functions_analyzed": 0, "functions_decompiled": 0, "created_at": "2026-05-20T09:55:06Z"}
         )
         assert_that(result, contains_string("0 analysed"))
         assert_that(result, is_not(contains_string("? analysed")))

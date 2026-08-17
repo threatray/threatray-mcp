@@ -100,7 +100,7 @@ There is intentionally no single "joined" tool today: each of the four sources h
 
 ## Progress reporting
 
-`threatray_get_capa` and `threatray_get_ai_analysis` may trigger long-running async jobs. They report progress via the FastMCP `Context.report_progress` API while polling.
+`threatray_get_capa` and `threatray_get_ai_analysis` may trigger long-running async jobs. They report progress via the FastMCP `Context.report_progress` API while polling. AI-analysis progress uses the server-owned stage, elapsed time, and nullable remaining-time range rather than presenting a synthetic completion percentage; the same fields are available from `threatray_get_latest_ai_job`.
 
 ## Pagination
 

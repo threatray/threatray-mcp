@@ -2,6 +2,11 @@
 
 from typing import Any
 
+from ..ai_analysis_status import (
+    ai_analysis_stage_label,
+    format_ai_analysis_elapsed,
+    format_ai_analysis_remaining,
+)
 from ._helpers import format_timestamp
 
 
@@ -24,7 +29,8 @@ def format_ai_analysis(data: dict[str, Any]) -> str:
     never silently drops entries.
 
     Trigger-only ack: `{"job": {job_id, file_hash, job_status}, "pending": true}`.
-    Latest-job shape: `{job_id, file_hash, job_status}` directly.
+    Latest-job shape: `{job_id, file_hash, job_status, started_at, stage,
+    remaining_time_estimate, result_id}` directly, with newer fields nullable.
     """
     # Trigger-only / pending ack first — has no detail to render.
     if data.get("pending") and isinstance(data.get("job"), dict):
@@ -40,12 +46,7 @@ def format_ai_analysis(data: dict[str, Any]) -> str:
 
     # Bare job-status payload (from /v1/ai-analysis/jobs/latest).
     if "job_status" in data and "verdict" not in data:
-        return (
-            "## AI Analysis Job\n\n"
-            f"- **Job ID**: `{data.get('job_id', '?')}`\n"
-            f"- **File hash**: `{data.get('file_hash', '?')}`\n"
-            f"- **Status**: {data.get('job_status', 'unknown')}\n"
-        )
+        return _format_ai_analysis_job(data)
 
     # Listing-shape entry (no `assessment`, no `functions`).
     if "verdict" not in data and "functions" not in data and "assessment" not in data:
@@ -100,6 +101,31 @@ def format_ai_analysis(data: dict[str, Any]) -> str:
             explanation = f.get("explanation", "")
             lines.append(f"- `{addr}` — {verdict}: {explanation}")
 
+    return "\n".join(lines) + "\n"
+
+
+def _format_ai_analysis_job(data: dict[str, Any]) -> str:
+    lines = [
+        "## AI Analysis Job",
+        "",
+        f"- **Job ID**: `{data.get('job_id', '?')}`",
+        f"- **File hash**: `{data.get('file_hash', '?')}`",
+        f"- **Status**: {data.get('job_status', 'unknown')}",
+    ]
+    if stage := ai_analysis_stage_label(data.get("stage")):
+        lines.append(f"- **Stage**: {stage}")
+    if created := data.get("created_at"):
+        lines.append(f"- **Created**: {format_timestamp(created)}")
+    if started := data.get("started_at"):
+        lines.append(f"- **Started**: {format_timestamp(started)}")
+    if elapsed := format_ai_analysis_elapsed(data):
+        lines.append(f"- **Elapsed**: {elapsed}")
+    if remaining := format_ai_analysis_remaining(data):
+        lines.append(f"- **Estimated remaining**: {remaining}")
+    elif data.get("job_status") == "PROCESSING":
+        lines.append("- **Estimated remaining**: unavailable")
+    if result_id := data.get("result_id"):
+        lines.append(f"- **Result ID**: `{result_id}`")
     return "\n".join(lines) + "\n"
 
 
