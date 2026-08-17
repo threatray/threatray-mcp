@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from math import floor, isfinite
 from typing import Any
 
-from .models.common import JobStatus
+from .models import JobStatus
 
 _STAGE_LABELS = {
     "PREPARING": "Preparing analysis",

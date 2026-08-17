@@ -114,12 +114,15 @@ class TestFormatAiAnalysisDetail(unittest.TestCase):
             "file_hash": DUMMY_SHA256,
             "job_status": "DONE",
             "started_at": "2026-08-17T09:58:00Z",
+            "stage": "SYNTHESIZING",
             "result_id": DUMMY_AI_ANALYSIS_ID,
         }
 
         result = format_ai_analysis(data)
 
         assert_that(result, contains_string(DUMMY_AI_ANALYSIS_ID))
+        assert_that(result, contains_string("Finalizing results"))
+        assert_that(result, is_not(contains_string("Step 4 of 4")))
         assert_that(result, is_not(contains_string("Elapsed")))
 
     def test_listing_summary_shape(self):

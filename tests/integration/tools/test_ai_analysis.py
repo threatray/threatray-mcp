@@ -65,4 +65,6 @@ class TestAiAnalysisProgress(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(updates)
         self.assertTrue(all(total is None for _, total, _ in updates))
-        self.assertTrue(any(message == "AI analysis: Complete" for _, _, message in updates))
+        progress_values = [progress for progress, _, _ in updates]
+        self.assertEqual(progress_values, sorted(progress_values))
+        self.assertTrue(any(progress == 4.0 and message == "AI analysis: Complete" for progress, _, message in updates))

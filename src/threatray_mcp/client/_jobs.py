@@ -49,7 +49,7 @@ class JobPoller:
             status = job.get("job_status")
 
             if progress_callback:
-                progress = min(0.9, 0.3 + (elapsed / self.timeout) * 0.6)
+                progress = self._progress_value(job, elapsed)
                 await progress_callback(progress, self._format_progress_message(job))
 
             if status == JobStatus.DONE.value:
@@ -62,3 +62,6 @@ class JobPoller:
     def _format_progress_message(self, job: dict[str, Any]) -> str:
         status = job.get("job_status")
         return f"{self._label} job {str(status).lower()}..." if status else "Processing..."
+
+    def _progress_value(self, _job: dict[str, Any], elapsed: float) -> float:
+        return min(0.9, 0.3 + (elapsed / self.timeout) * 0.6)

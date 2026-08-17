@@ -8,6 +8,7 @@ from ..ai_analysis_status import (
     format_ai_analysis_elapsed,
     format_ai_analysis_remaining,
 )
+from ..models import JobStatus
 from ._helpers import format_timestamp
 
 
@@ -114,7 +115,8 @@ def _format_ai_analysis_job(data: dict[str, Any]) -> str:
         f"- **Status**: {data.get('job_status', 'unknown')}",
     ]
     if stage := ai_analysis_stage_label(data.get("stage")):
-        if step := ai_analysis_stage_step(data):
+        status = str(data.get("job_status") or "").upper()
+        if status == JobStatus.PROCESSING.value and (step := ai_analysis_stage_step(data)):
             stage = f"{stage} · {step}"
         lines.append(f"- **Stage**: {stage}")
     if created := data.get("created_at"):

@@ -129,10 +129,10 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
                 httpx.Response(200, json={"job_id": "j1", "job_status": "DONE"}),
             ]
         )
-        messages: list[str] = []
+        updates: list[tuple[float, str]] = []
 
-        async def progress_callback(_progress: float, message: str) -> None:
-            messages.append(message)
+        async def progress_callback(progress: float, message: str) -> None:
+            updates.append((progress, message))
 
         await self.client.get(
             SHA,
@@ -142,8 +142,14 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertTrue(
-            any("Analyzing functions · Step 3 of 4 · 40s\N{EN DASH}2m left" in message for message in messages)
+            any(
+                progress == 3.0 and "Analyzing functions · Step 3 of 4 · 40s\N{EN DASH}2m left" in message
+                for progress, message in updates
+            )
         )
+        progress_values = [progress for progress, _ in updates]
+        self.assertEqual(progress_values, sorted(progress_values))
+        self.assertEqual(progress_values[-1], 4.0)
 
     @respx.mock
     async def test_trigger_only_returns_job_without_polling(self):
