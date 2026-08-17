@@ -141,7 +141,9 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
             progress_callback=progress_callback,
         )
 
-        self.assertTrue(any("AI review" in message and "about 40s-2m remaining" in message for message in messages))
+        self.assertTrue(
+            any("Analyzing functions · Step 3 of 4 · 40s\N{EN DASH}2m left" in message for message in messages)
+        )
 
     @respx.mock
     async def test_trigger_only_returns_job_without_polling(self):

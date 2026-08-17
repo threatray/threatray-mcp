@@ -104,8 +104,9 @@ class TestFormatAiAnalysisDetail(unittest.TestCase):
         assert_that(result, contains_string("AI Analysis Job"))
         assert_that(result, contains_string("PROCESSING"))
         assert_that(result, contains_string("Decompiling code"))
+        assert_that(result, contains_string("Step 2 of 4"))
         assert_that(result, contains_string("Elapsed"))
-        assert_that(result, contains_string("about 1m-7m remaining"))
+        assert_that(result, contains_string("1\N{EN DASH}7m left"))
 
     def test_latest_completed_job_includes_exact_result_id_without_live_elapsed(self):
         data = {

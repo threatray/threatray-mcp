@@ -1,24 +1,39 @@
-"""Presentation helpers for AI-analysis job status payloads."""
+"""Presentation helpers for AI-analysis job status payloads.
+
+Keep the user-facing copy and duration formatting aligned with the Threatray UI's
+``ai-analysis-progress`` and ``format-ai-analysis-estimate`` utilities.
+"""
 
 from datetime import datetime, timezone
-from math import ceil, floor, isfinite
+from math import floor, isfinite
 from typing import Any
 
 from .models.common import JobStatus
 
 _STAGE_LABELS = {
-    "PREPARING": "Preparing",
+    "PREPARING": "Preparing analysis",
     "DECOMPILING": "Decompiling code",
-    "ANALYZING": "AI review",
-    "SYNTHESIZING": "Building verdict",
+    "ANALYZING": "Analyzing functions",
+    "SYNTHESIZING": "Finalizing results",
 }
+_STAGES = tuple(_STAGE_LABELS)
+_ESTIMATED_STAGES = frozenset(("DECOMPILING", "ANALYZING", "SYNTHESIZING"))
+_RANGE_SEPARATOR = "\N{EN DASH}"
 
 
 def ai_analysis_stage_label(stage: Any) -> str | None:
     if stage is None or stage == "":
         return None
-    text = str(stage)
-    return _STAGE_LABELS.get(text, text.replace("_", " ").title())
+    return _STAGE_LABELS.get(_normalized_stage(stage), "Analyzing")
+
+
+def ai_analysis_stage_step(job: dict[str, Any]) -> str | None:
+    stage = _normalized_stage(job.get("stage"))
+    try:
+        index = _STAGES.index(stage)
+    except ValueError:
+        return None
+    return f"Step {index + 1} of {len(_STAGES)}"
 
 
 def format_ai_analysis_elapsed(
@@ -39,47 +54,46 @@ def format_ai_analysis_elapsed(
 
 
 def format_ai_analysis_remaining(job: dict[str, Any]) -> str | None:
-    if (status := job.get("job_status")) is not None and _normalized_status(status) != JobStatus.PROCESSING.value:
+    if _normalized_status(job.get("job_status")) != JobStatus.PROCESSING.value:
         return None
     estimate = job.get("remaining_time_estimate")
     if not isinstance(estimate, dict):
-        return None
+        stage = _normalized_stage(job.get("stage"))
+        return "Taking longer than expected" if stage in _ESTIMATED_STAGES else None
     minimum_raw = _numeric_seconds(estimate.get("minimum_seconds"))
     maximum_raw = _numeric_seconds(estimate.get("maximum_seconds"))
     if minimum_raw is None or maximum_raw is None or minimum_raw < 0 or maximum_raw < minimum_raw:
         return None
-    minimum = floor(minimum_raw)
-    maximum = ceil(maximum_raw)
-    low = _format_rough_duration(minimum, round_up=False)
-    high = _format_rough_duration(maximum, round_up=True)
-    if low == high:
-        return f"about {low} remaining"
-    return f"about {low}-{high} remaining"
+    return _format_compact_estimate(minimum_raw, maximum_raw)
 
 
 def format_ai_analysis_job_progress(job: dict[str, Any]) -> str:
     status = _normalized_status(job.get("job_status"))
     stage = ai_analysis_stage_label(job.get("stage"))
     if status in (JobStatus.CREATED.value, JobStatus.QUEUED.value):
-        activity = "Waiting for a worker"
+        activity = "Analysis queued"
     elif status == JobStatus.DONE.value:
         activity = "Complete"
     elif status in (JobStatus.FAILED.value, JobStatus.UNSUPPORTED.value, JobStatus.SKIPPED.value):
         activity = status.title()
     else:
-        activity = stage or status.title() or "Processing"
+        activity = stage or "Analyzing"
 
     parts = [f"AI analysis: {activity}"]
-    if elapsed := format_ai_analysis_elapsed(job):
-        parts.append(f"elapsed {elapsed}")
+    if status == JobStatus.PROCESSING.value and (step := ai_analysis_stage_step(job)):
+        parts.append(step)
     if remaining := format_ai_analysis_remaining(job):
         parts.append(remaining)
-    elif status == JobStatus.PROCESSING.value:
-        parts.append("remaining time unavailable")
+    if elapsed := format_ai_analysis_elapsed(job):
+        parts.append(f"{elapsed} elapsed")
     return " · ".join(parts)
 
 
 def _normalized_status(value: Any) -> str:
+    return str(value or "").upper()
+
+
+def _normalized_stage(value: Any) -> str:
     return str(value or "").upper()
 
 
@@ -106,24 +120,35 @@ def _parse_datetime(value: Any) -> datetime | None:
 
 
 def _format_duration(seconds: int) -> str:
-    hours, remainder = divmod(seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    if hours:
-        return f"{hours}h {minutes}m"
-    if minutes:
-        return f"{minutes}m {seconds}s"
-    return f"{seconds}s"
-
-
-def _format_rough_duration(seconds: int, *, round_up: bool) -> str:
-    round_units = ceil if round_up else floor
     if seconds < 60:
-        rounded_seconds = max(5, round_units(seconds / 5) * 5)
-        return f"{rounded_seconds}s"
-    total_minutes = max(1, round_units(seconds / 60))
-    hours, minutes = divmod(total_minutes, 60)
-    if hours and minutes:
-        return f"{hours}h {minutes}m"
-    if hours:
-        return f"{hours}h"
-    return f"{minutes}m"
+        return f"{seconds}s"
+    minutes, seconds = divmod(seconds, 60)
+    return f"{minutes}:{seconds:02d}"
+
+
+def _format_compact_estimate(minimum_seconds: float, maximum_seconds: float) -> str:
+    if maximum_seconds < 60:
+        low = _rounded_seconds(minimum_seconds)
+        high = _rounded_seconds(maximum_seconds)
+        value = f"{low}s" if low == high else f"{low}{_RANGE_SEPARATOR}{high}s"
+    elif minimum_seconds >= 60:
+        low = _rounded_minutes(minimum_seconds)
+        high = _rounded_minutes(maximum_seconds)
+        value = f"{low}m" if low == high else f"{low}{_RANGE_SEPARATOR}{high}m"
+    else:
+        value = f"{_format_estimate_bound(minimum_seconds)}{_RANGE_SEPARATOR}{_format_estimate_bound(maximum_seconds)}"
+    return f"{value} left"
+
+
+def _format_estimate_bound(seconds: float) -> str:
+    if seconds < 60:
+        return f"{_rounded_seconds(seconds)}s"
+    return f"{_rounded_minutes(seconds)}m"
+
+
+def _rounded_seconds(seconds: float) -> int:
+    return max(5, floor(seconds / 5 + 0.5) * 5)
+
+
+def _rounded_minutes(seconds: float) -> int:
+    return max(1, floor(seconds / 60 + 0.5))

@@ -4,10 +4,10 @@ from typing import Any
 
 from ..ai_analysis_status import (
     ai_analysis_stage_label,
+    ai_analysis_stage_step,
     format_ai_analysis_elapsed,
     format_ai_analysis_remaining,
 )
-from ..models.common import JobStatus
 from ._helpers import format_timestamp
 
 
@@ -114,6 +114,8 @@ def _format_ai_analysis_job(data: dict[str, Any]) -> str:
         f"- **Status**: {data.get('job_status', 'unknown')}",
     ]
     if stage := ai_analysis_stage_label(data.get("stage")):
+        if step := ai_analysis_stage_step(data):
+            stage = f"{stage} · {step}"
         lines.append(f"- **Stage**: {stage}")
     if created := data.get("created_at"):
         lines.append(f"- **Created**: {format_timestamp(created)}")
@@ -123,8 +125,6 @@ def _format_ai_analysis_job(data: dict[str, Any]) -> str:
         lines.append(f"- **Elapsed**: {elapsed}")
     if remaining := format_ai_analysis_remaining(data):
         lines.append(f"- **Estimated remaining**: {remaining}")
-    elif str(data.get("job_status") or "").upper() == JobStatus.PROCESSING.value:
-        lines.append("- **Estimated remaining**: unavailable")
     if result_id := data.get("result_id"):
         lines.append(f"- **Result ID**: `{result_id}`")
     return "\n".join(lines) + "\n"
