@@ -1,8 +1,10 @@
 """Presentation helpers for AI-analysis job status payloads."""
 
 from datetime import datetime, timezone
-from math import ceil, floor
+from math import ceil, floor, isfinite
 from typing import Any
+
+from .models.common import JobStatus
 
 _STAGE_LABELS = {
     "PREPARING": "Preparing",
@@ -24,7 +26,7 @@ def format_ai_analysis_elapsed(
     *,
     now: datetime | None = None,
 ) -> str | None:
-    if job.get("job_status") != "PROCESSING":
+    if _normalized_status(job.get("job_status")) != JobStatus.PROCESSING.value:
         return None
     started_at = _parse_datetime(job.get("started_at"))
     if started_at is None:
@@ -37,15 +39,17 @@ def format_ai_analysis_elapsed(
 
 
 def format_ai_analysis_remaining(job: dict[str, Any]) -> str | None:
-    if (status := job.get("job_status")) is not None and status != "PROCESSING":
+    if (status := job.get("job_status")) is not None and _normalized_status(status) != JobStatus.PROCESSING.value:
         return None
     estimate = job.get("remaining_time_estimate")
     if not isinstance(estimate, dict):
         return None
-    minimum = estimate.get("minimum_seconds")
-    maximum = estimate.get("maximum_seconds")
-    if not isinstance(minimum, int) or not isinstance(maximum, int) or minimum < 0 or maximum < minimum:
+    minimum_raw = _numeric_seconds(estimate.get("minimum_seconds"))
+    maximum_raw = _numeric_seconds(estimate.get("maximum_seconds"))
+    if minimum_raw is None or maximum_raw is None or minimum_raw < 0 or maximum_raw < minimum_raw:
         return None
+    minimum = floor(minimum_raw)
+    maximum = ceil(maximum_raw)
     low = _format_rough_duration(minimum, round_up=False)
     high = _format_rough_duration(maximum, round_up=True)
     if low == high:
@@ -54,13 +58,13 @@ def format_ai_analysis_remaining(job: dict[str, Any]) -> str | None:
 
 
 def format_ai_analysis_job_progress(job: dict[str, Any]) -> str:
-    status = str(job.get("job_status") or "").upper()
+    status = _normalized_status(job.get("job_status"))
     stage = ai_analysis_stage_label(job.get("stage"))
-    if status in ("CREATED", "QUEUED"):
+    if status in (JobStatus.CREATED.value, JobStatus.QUEUED.value):
         activity = "Waiting for a worker"
-    elif status == "DONE":
+    elif status == JobStatus.DONE.value:
         activity = "Complete"
-    elif status in ("FAILED", "UNSUPPORTED", "SKIPPED"):
+    elif status in (JobStatus.FAILED.value, JobStatus.UNSUPPORTED.value, JobStatus.SKIPPED.value):
         activity = status.title()
     else:
         activity = stage or status.title() or "Processing"
@@ -70,9 +74,20 @@ def format_ai_analysis_job_progress(job: dict[str, Any]) -> str:
         parts.append(f"elapsed {elapsed}")
     if remaining := format_ai_analysis_remaining(job):
         parts.append(remaining)
-    elif status == "PROCESSING":
+    elif status == JobStatus.PROCESSING.value:
         parts.append("remaining time unavailable")
     return " · ".join(parts)
+
+
+def _normalized_status(value: Any) -> str:
+    return str(value or "").upper()
+
+
+def _numeric_seconds(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    seconds = float(value)
+    return seconds if isfinite(seconds) else None
 
 
 def _parse_datetime(value: Any) -> datetime | None:

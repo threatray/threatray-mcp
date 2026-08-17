@@ -80,6 +80,45 @@ class TestAiAnalysisStatus(unittest.TestCase):
             "about 1m-2m remaining",
         )
 
+    def test_float_eta_bounds_are_accepted_and_rounded_outward(self):
+        self.assertEqual(
+            format_ai_analysis_remaining(
+                {
+                    "job_status": "processing",
+                    "remaining_time_estimate": {
+                        "minimum_seconds": 61.2,
+                        "maximum_seconds": 119.1,
+                    },
+                }
+            ),
+            "about 1m-2m remaining",
+        )
+
+    def test_boolean_eta_bound_is_rejected(self):
+        self.assertIsNone(
+            format_ai_analysis_remaining(
+                {
+                    "job_status": "PROCESSING",
+                    "remaining_time_estimate": {
+                        "minimum_seconds": True,
+                        "maximum_seconds": 120,
+                    },
+                }
+            )
+        )
+
+    def test_lowercase_processing_status_keeps_elapsed_time(self):
+        self.assertEqual(
+            format_ai_analysis_elapsed(
+                {
+                    "job_status": "processing",
+                    "started_at": "2026-08-17T09:58:48Z",
+                },
+                now=datetime(2026, 8, 17, 10, 0, tzinfo=timezone.utc),
+            ),
+            "1m 12s",
+        )
+
     def test_terminal_job_ignores_stale_eta(self):
         self.assertIsNone(
             format_ai_analysis_remaining(

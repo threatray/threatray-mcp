@@ -7,6 +7,7 @@ from ..ai_analysis_status import (
     format_ai_analysis_elapsed,
     format_ai_analysis_remaining,
 )
+from ..models.common import JobStatus
 from ._helpers import format_timestamp
 
 
@@ -122,7 +123,7 @@ def _format_ai_analysis_job(data: dict[str, Any]) -> str:
         lines.append(f"- **Elapsed**: {elapsed}")
     if remaining := format_ai_analysis_remaining(data):
         lines.append(f"- **Estimated remaining**: {remaining}")
-    elif data.get("job_status") == "PROCESSING":
+    elif str(data.get("job_status") or "").upper() == JobStatus.PROCESSING.value:
         lines.append("- **Estimated remaining**: unavailable")
     if result_id := data.get("result_id"):
         lines.append(f"- **Result ID**: `{result_id}`")
