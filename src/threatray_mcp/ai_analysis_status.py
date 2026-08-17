@@ -67,7 +67,11 @@ def format_ai_analysis_remaining(job: dict[str, Any]) -> str | None:
     return _format_compact_estimate(minimum_raw, maximum_raw)
 
 
-def format_ai_analysis_job_progress(job: dict[str, Any]) -> str:
+def format_ai_analysis_job_progress(
+    job: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> str:
     status = _normalized_status(job.get("job_status"))
     stage = ai_analysis_stage_label(job.get("stage"))
     if status in (JobStatus.CREATED.value, JobStatus.QUEUED.value):
@@ -84,7 +88,7 @@ def format_ai_analysis_job_progress(job: dict[str, Any]) -> str:
         parts.append(step)
     if remaining := format_ai_analysis_remaining(job):
         parts.append(remaining)
-    if elapsed := format_ai_analysis_elapsed(job):
+    if elapsed := format_ai_analysis_elapsed(job, now=now):
         parts.append(f"{elapsed} elapsed")
     return " · ".join(parts)
 

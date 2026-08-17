@@ -1,7 +1,7 @@
 """Tests for AI-analysis job status presentation."""
 
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from threatray_mcp.ai_analysis_status import (
     ai_analysis_stage_label,
@@ -60,7 +60,7 @@ class TestAiAnalysisStatus(unittest.TestCase):
         job = {
             "job_status": "PROCESSING",
             "stage": "ANALYZING",
-            "started_at": (datetime.now(timezone.utc) - timedelta(seconds=72)).isoformat(),
+            "started_at": "2026-08-17T09:58:48Z",
             "remaining_time_estimate": {
                 "minimum_seconds": 42,
                 "maximum_seconds": 96,
@@ -69,7 +69,10 @@ class TestAiAnalysisStatus(unittest.TestCase):
 
         self.assertEqual(ai_analysis_stage_label(job["stage"]), "Analyzing functions")
         self.assertEqual(
-            format_ai_analysis_job_progress(job),
+            format_ai_analysis_job_progress(
+                job,
+                now=datetime(2026, 8, 17, 10, 0, tzinfo=timezone.utc),
+            ),
             "AI analysis: Analyzing functions · Step 3 of 4 · 40s\N{EN DASH}2m left · 1:12 elapsed",
         )
 
