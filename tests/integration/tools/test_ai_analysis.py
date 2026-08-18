@@ -1,6 +1,7 @@
 """Integration tool tests — full path via fastmcp.Client + respx-mocked upstream."""
 
 import unittest
+from itertools import pairwise
 
 import httpx
 import respx
@@ -66,5 +67,6 @@ class TestAiAnalysisProgress(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(updates)
         self.assertTrue(all(total is None for _, total, _ in updates))
         progress_values = [progress for progress, _, _ in updates]
-        self.assertEqual(progress_values, sorted(progress_values))
+        self.assertEqual(progress_values, [1.0, 2.0, 3.0, 4.0, 5.0])
+        self.assertTrue(all(current < following for current, following in pairwise(progress_values)))
         self.assertTrue(any(progress == 4.0 and message == "AI analysis: Complete" for progress, _, message in updates))

@@ -3,6 +3,7 @@ get-by-id and get-latest-job."""
 
 import json
 import unittest
+from itertools import pairwise
 
 import httpx
 import respx
@@ -101,7 +102,7 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["id"], "fresh")
 
     @respx.mock
-    async def test_trigger_flow_reports_server_owned_stage_and_eta(self):
+    async def test_trigger_flow_reports_strict_progress_across_stage_lifecycle(self):
         respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
             side_effect=[
                 httpx.Response(200, json={"results": []}),
@@ -115,6 +116,14 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
             side_effect=[
                 httpx.Response(
                     200,
+                    json={"job_id": "j1", "job_status": "PROCESSING", "stage": "PREPARING"},
+                ),
+                httpx.Response(
+                    200,
+                    json={"job_id": "j1", "job_status": "PROCESSING", "stage": "DECOMPILING"},
+                ),
+                httpx.Response(
+                    200,
                     json={
                         "job_id": "j1",
                         "job_status": "PROCESSING",
@@ -125,6 +134,10 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
                             "maximum_seconds": 96,
                         },
                     },
+                ),
+                httpx.Response(
+                    200,
+                    json={"job_id": "j1", "job_status": "PROCESSING", "stage": "SYNTHESIZING"},
                 ),
                 httpx.Response(200, json={"job_id": "j1", "job_status": "DONE"}),
             ]
@@ -141,15 +154,73 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
             progress_callback=progress_callback,
         )
 
-        self.assertTrue(
-            any(
-                progress == 3.0 and "Analyzing functions · Step 3 of 4 · 40s\N{EN DASH}2m left" in message
-                for progress, message in updates
-            )
+        self.assertEqual(
+            [progress for progress, _ in updates],
+            [float(value) for value in range(1, 10)],
         )
+        messages = [message for _, message in updates]
+        self.assertIn("Preparing analysis · Step 1 of 4", messages[3])
+        self.assertIn("Decompiling code · Step 2 of 4", messages[4])
+        self.assertIn("Analyzing functions · Step 3 of 4 · 40s\N{EN DASH}2m left", messages[5])
+        self.assertIn("Finalizing results · Step 4 of 4", messages[6])
+        self.assertEqual(messages[7:], ["AI analysis: Complete", "Fetching results..."])
+
+    @respx.mock
+    async def test_progress_stays_strict_when_stages_repeat_regress_or_are_unknown(self):
+        result_id = "00000000-0000-0000-0000-000000000001"
+        respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(return_value=httpx.Response(200, json={"results": []}))
+        respx.post(f"{API_BASE}/v1/ai-analysis/jobs").mock(
+            return_value=httpx.Response(200, json={"job_id": "j1", "job_status": "QUEUED"})
+        )
+        respx.get(f"{API_BASE}/v1/ai-analysis/jobs/j1").mock(
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json={"job_id": "j1", "job_status": "PROCESSING", "stage": "PREPARING"},
+                ),
+                httpx.Response(
+                    200,
+                    json={"job_id": "j1", "job_status": "PROCESSING", "stage": "PREPARING"},
+                ),
+                httpx.Response(
+                    200,
+                    json={"job_id": "j1", "job_status": "PROCESSING", "stage": "NEW_STAGE"},
+                ),
+                httpx.Response(
+                    200,
+                    json={"job_id": "j1", "job_status": "PROCESSING", "stage": "ANALYZING"},
+                ),
+                httpx.Response(
+                    200,
+                    json={"job_id": "j1", "job_status": "PROCESSING", "stage": "PREPARING"},
+                ),
+                httpx.Response(
+                    200,
+                    json={"job_id": "j1", "job_status": "DONE", "result_id": result_id},
+                ),
+            ]
+        )
+        respx.get(f"{API_BASE}/v1/ai-analysis/results/{result_id}").mock(
+            return_value=httpx.Response(200, json={"id": result_id, "assessment": "fresh"})
+        )
+        updates: list[tuple[float, str]] = []
+
+        async def progress_callback(progress: float, message: str) -> None:
+            updates.append((progress, message))
+
+        await self.client.get(
+            SHA,
+            trigger_if_missing=True,
+            max_wait_seconds=30,
+            progress_callback=progress_callback,
+        )
+
         progress_values = [progress for progress, _ in updates]
-        self.assertEqual(progress_values, sorted(progress_values))
-        self.assertEqual(progress_values[-1], 4.0)
+        self.assertEqual(progress_values, [float(value) for value in range(1, len(updates) + 1)])
+        self.assertTrue(all(current < following for current, following in pairwise(progress_values)))
+        messages = [message for _, message in updates]
+        self.assertEqual(sum("Preparing analysis · Step 1 of 4" in message for message in messages), 3)
+        self.assertTrue(any(message == "AI analysis: Analyzing" for message in messages))
 
     @respx.mock
     async def test_trigger_only_returns_job_without_polling(self):
