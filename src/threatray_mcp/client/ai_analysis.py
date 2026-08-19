@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from ..ai_analysis_status import format_ai_analysis_job_progress
 from ..errors import (
     ThreatrayFeatureUnavailable,
     ThreatrayJobFailed,
@@ -19,13 +20,18 @@ from ._types import AiAnalysisId, FileHashSha256, ProgressCallback
 _AI_TERMINAL_FAILURES = (JobStatus.UNSUPPORTED.value, JobStatus.SKIPPED.value)
 
 
+class _AiAnalysisJobPoller(JobPoller):
+    def _format_progress_message(self, job: dict[str, Any]) -> str:
+        return format_ai_analysis_job_progress(job)
+
+
 class AiAnalysisClient:
     def __init__(self, http: HttpClient, poll_interval: int = 10):
         self._http = http
         self._poll_interval = poll_interval
 
     def _build_poller(self, timeout: int) -> JobPoller:
-        return JobPoller(
+        return _AiAnalysisJobPoller(
             self._http,
             "/v1/ai-analysis",
             "AI analysis",
@@ -46,9 +52,23 @@ class AiAnalysisClient:
         max_wait_seconds: int = 600,
         progress_callback: ProgressCallback = None,
     ) -> dict[str, Any]:
+        # MCP requires every notification for a request to strictly increase.
+        # The server owns stage/ETA semantics, while this sequence only orders
+        # the indeterminate updates that carry those values in their message.
+        progress_sequence = 0.0
+
+        async def report_progress(message: str) -> None:
+            nonlocal progress_sequence
+            if progress_callback is None:
+                return
+            progress_sequence += 1.0
+            await progress_callback(progress_sequence, message)
+
+        async def report_poll_progress(_progress: float, message: str) -> None:
+            await report_progress(message)
+
         try:
-            if progress_callback:
-                await progress_callback(0.1, "Checking for existing AI analysis...")
+            await report_progress("Checking for existing AI analysis...")
             results = await self._http.get("/v1/ai-analysis/results", params={"file_hash": file_hash})
         except ThreatrayNotFound as e:
             raise ThreatrayFeatureUnavailable("AI analysis is not enabled for this account.") from e
@@ -59,24 +79,25 @@ class AiAnalysisClient:
         if not trigger_if_missing:
             raise ThreatrayNotFound("No AI analysis results found for this file.")
 
-        if progress_callback:
-            await progress_callback(0.2, "No existing analysis, creating AI analysis job...")
+        await report_progress("No existing analysis, creating AI analysis job...")
         job = await self._create_job(file_hash)
         status = job.get("job_status", "unknown")
         if status == JobStatus.FAILED.value or status in _AI_TERMINAL_FAILURES:
             raise ThreatrayJobFailed(f"AI analysis job {str(status).lower()}")
 
         if trigger_only:
-            if progress_callback:
-                await progress_callback(0.5, "AI analysis job created. Returning without polling.")
+            await report_progress("AI analysis job created. Returning without polling.")
             return {"job": job, "pending": True}
 
-        if progress_callback:
-            await progress_callback(0.3, "Job created, waiting for completion...")
+        await report_progress("Job created, waiting for completion...")
         poller = self._build_poller(max_wait_seconds)
-        await poller.poll(job["job_id"], progress_callback)
-        if progress_callback:
-            await progress_callback(0.95, "Fetching results...")
+        completed_job = await poller.poll(
+            job["job_id"],
+            report_poll_progress if progress_callback else None,
+        )
+        await report_progress("Fetching results...")
+        if result_id := completed_job.get("result_id"):
+            return await self.get_result_by_id(AiAnalysisId(str(result_id)))
         results = await self._http.get("/v1/ai-analysis/results", params={"file_hash": file_hash})
         if results.get("results"):
             final: dict[str, Any] = results["results"][0]

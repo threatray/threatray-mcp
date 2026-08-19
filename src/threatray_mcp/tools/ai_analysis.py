@@ -45,7 +45,7 @@ def register(mcp: FastMCP) -> None:
         client = get_client(ctx)
 
         async def progress_callback(progress: float, message: str) -> None:
-            await ctx.report_progress(int(progress * 100), 100, message)
+            await ctx.report_progress(progress, message=message)
 
         result = await client.ai_analysis.get(
             FileHashSha256(params.file_hash),
@@ -124,7 +124,8 @@ def register(mcp: FastMCP) -> None:
         Useful when `threatray_get_ai_analysis` was previously called with
         `trigger_only=True`: the kickoff returned just the job id, and this tool lets
         you poll later for completion (`job_status` of `DONE`, `FAILED`, `UNSUPPORTED`,
-        or `SKIPPED`).
+        or `SKIPPED`). Processing jobs include their current stage, start time, and a
+        nullable server-calculated remaining-time range.
         """
         client = get_client(ctx)
         result = await client.ai_analysis.get_latest_job(FileHashSha256(params.file_hash))

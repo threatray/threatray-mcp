@@ -50,8 +50,7 @@ class JobPoller:
 
             if progress_callback:
                 progress = min(0.9, 0.3 + (elapsed / self.timeout) * 0.6)
-                status_msg = f"{self._label} job {status.lower()}..." if status else "Processing..."
-                await progress_callback(progress, status_msg)
+                await progress_callback(progress, self._format_progress_message(job))
 
             if status == JobStatus.DONE.value:
                 return job
@@ -59,3 +58,7 @@ class JobPoller:
                 raise ThreatrayJobFailed(f"{self._label} job {job_id} {str(status).lower()}")
 
             await asyncio.sleep(self.poll_interval)
+
+    def _format_progress_message(self, job: dict[str, Any]) -> str:
+        status = job.get("job_status")
+        return f"{self._label} job {str(status).lower()}..." if status else "Processing..."
