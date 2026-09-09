@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from ..models import JobStatus
+
 # Mirror the UI's noise filter — internal / library / hosts namespaces don't
 # represent malicious capabilities, just engine plumbing and library code.
 _NOISY_NAMESPACE_PREFIXES = ("internal/", "library/", "host-interaction/internal")
@@ -213,3 +215,76 @@ def _render_rule(
         else:
             out.append(f"  - Addresses: {', '.join(match_addrs)}")
     return out
+
+
+def format_capa_job(job: dict[str, Any]) -> str:
+    """Render one CAPA job status from `/v1/capa-analysis/jobs/{job_id}`.
+
+    The payload carries exactly `job_id`, `file_hash` and `job_status` — no
+    stage, progress or timestamps — so this renders no ETA and no elapsed time.
+
+    CAPA jobs report CREATED, QUEUED, PROCESSING, DONE or FAILED, and matching
+    is case-insensitive. Anything outside those five — a value added later, or a
+    missing field — is shown verbatim with no next-step line, because guessing a
+    meaning for a status we do not know is how an agent ends up polling a
+    finished job.
+
+    The next-step line only ever says what the caller can do now: poll while
+    the job is running, fetch the result once it is DONE, stop once it has
+    FAILED. It never suggests re-triggering — that turns a status read into a
+    write, and an agent that acts on the suggestion each time it polls has a
+    loop.
+    """
+    raw_status = job.get("job_status")
+    shown = str(raw_status) if raw_status not in (None, "") else "unknown"
+    status = shown.upper()
+    lines = [
+        "## CAPA Analysis Job",
+        "",
+        f"- **Job ID**: `{job.get('job_id', '?')}`",
+        f"- **File hash**: `{job.get('file_hash', '?')}`",
+        f"- **Status**: {shown}",
+    ]
+
+    if status == JobStatus.DONE.value:
+        hint = "*Fetch the result with `threatray_get_capa(file_hash, trigger_if_missing=False)`.*"
+    elif status == JobStatus.FAILED.value:
+        hint = "*This job failed and will not progress on its own.*"
+    elif status == JobStatus.PROCESSING.value:
+        hint = (
+            "*Still running — poll `threatray_get_capa_job` again after a short wait, "
+            "and stop rather than polling indefinitely.*"
+        )
+    elif status in (JobStatus.CREATED.value, JobStatus.QUEUED.value):
+        hint = (
+            "*Not started yet — poll `threatray_get_capa_job` again after a short "
+            "wait, and stop rather than polling indefinitely.*"
+        )
+    else:
+        # Unrecognised or absent: report it and stop. Any next-step line here
+        # would be a guess about a status this client does not know.
+        hint = ""
+
+    if hint:
+        lines.extend(("", hint))
+    return "\n".join(lines) + "\n"
+
+
+def format_capa_job_ack(job: dict[str, Any]) -> str:
+    """Render the `trigger_only=True` acknowledgement.
+
+    The heading names neither a status nor an action: the create route is
+    get-or-create, so this call may return a job that was already in flight and
+    may have started nothing. Both "queued" and "triggered" would assert more
+    than the response supports.
+    """
+    raw_status = job.get("job_status")
+    shown = str(raw_status) if raw_status not in (None, "") else "unknown"
+    return (
+        "## CAPA Analysis Job\n\n"
+        f"- **Job ID**: `{job.get('job_id', '?')}`\n"
+        f"- **File hash**: `{job.get('file_hash', '?')}`\n"
+        f"- **Status**: {shown}\n\n"
+        "*Poll with `threatray_get_capa_job` using the job-id above, then fetch the "
+        "result with `threatray_get_capa(file_hash, trigger_if_missing=False)`.*\n"
+    )

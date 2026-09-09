@@ -6,7 +6,7 @@ from ..errors import ThreatrayJobFailed, ThreatrayNotFound
 from ..models import JobStatus
 from ._http import HttpClient
 from ._jobs import JobPoller
-from ._types import FileHashSha256, ProgressCallback
+from ._types import CapaJobId, FileHashSha256, ProgressCallback
 
 
 class CapaClient:
@@ -18,6 +18,20 @@ class CapaClient:
 
     async def _create_job(self, file_hash: FileHashSha256) -> dict[str, Any]:
         return await self._http.post("/v1/capa-analysis/jobs", {"file_hash": file_hash})
+
+    async def get_job(self, job_id: CapaJobId) -> dict[str, Any]:
+        """Fetch one CAPA job's status by id.
+
+        Delegates to the poller so the job URL is built in exactly one place.
+        """
+        try:
+            return await self._poller.get_job(job_id)
+        except ThreatrayNotFound as e:
+            # Name the id so the agent can tell which lookup failed, but claim no
+            # cause: a job-route 404 is ambiguous between "no such job" and "this
+            # realm has no /v1/capa-analysis route". Same reasoning as
+            # AiAnalysisClient.get_latest_job.
+            raise ThreatrayNotFound(f"No CAPA job found for id {job_id}.", e.status_code) from e
 
     async def get(
         self,

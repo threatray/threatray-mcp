@@ -36,6 +36,10 @@ AiAnalysisId = NewType("AiAnalysisId", str)
 """Identifier of an AI analysis result (UUID-shaped). Distinct from
 SampleAnalysisId — used by /v1/ai-analysis/results/{id}."""
 
+CapaJobId = NewType("CapaJobId", str)
+"""Identifier of a CAPA analysis job (UUID-shaped). Distinct from AiAnalysisId
+— used by /v1/capa-analysis/jobs/{id}."""
+
 TaskId = NewType("TaskId", int)
 """Numeric task id returned by /v1/submissions/* and /v1/tasks/*. Tasks track
 the lifecycle of a single submission as it moves through the analysis pipeline."""

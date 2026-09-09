@@ -79,3 +79,6 @@ dmypy.json
 .DS_Store
 Thumbs.db
 
+
+# Stray wheel downloads must never be committed — they were once.
+*.whl

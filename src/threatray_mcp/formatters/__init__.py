@@ -7,7 +7,7 @@ from .analyses import (
     format_endpoint_scan_analyses,
     format_osint_report,
 )
-from .capa import format_capa_results
+from .capa import format_capa_job, format_capa_job_ack, format_capa_results
 from .files import format_file_metadata, format_strings_list
 from .functions import (
     format_code_detections,
@@ -29,6 +29,8 @@ __all__ = [
     "format_ai_analysis_list",
     "format_analyses_list",
     "format_analysis_details",
+    "format_capa_job",
+    "format_capa_job_ack",
     "format_capa_results",
     "format_code_detections",
     "format_endpoint_scan_analyses",

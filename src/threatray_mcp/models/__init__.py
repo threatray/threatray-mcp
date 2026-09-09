@@ -12,7 +12,7 @@ from .analyses import (
     EndpointScanAnalysesListInput,
     OsintInput,
 )
-from .capa import CapaInput
+from .capa import CapaInput, CapaJobInput
 from .common import (
     AnalysisMode,
     HashAny,
@@ -51,6 +51,7 @@ __all__ = [
     "AnalysisIdInput",
     "AnalysisMode",
     "CapaInput",
+    "CapaJobInput",
     "CodeDetectionsInput",
     "DiffFunctionsInput",
     "EndpointScanAnalysesListInput",
