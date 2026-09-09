@@ -348,9 +348,14 @@ class TestFormatCapaJob(unittest.TestCase):
         # PROCESSING would be polled forever. Say when to give up instead.
         assert_that(out, contains_string("stop rather than polling indefinitely"))
 
-    def test_created_and_queued_say_not_started(self):
+    def test_created_and_queued_say_not_started_and_carry_the_same_bound(self):
+        """Every polling branch needs the stop cue, not just PROCESSING: a job
+        sitting in QUEUED leaves an agent in the same unbounded loop."""
         for status in ("CREATED", "QUEUED"):
-            assert_that(format_capa_job(self._job(status)), contains_string("Not started yet"))
+            out = format_capa_job(self._job(status))
+            assert_that(out, contains_string("Not started yet"))
+            assert_that(out, contains_string("stop rather than polling indefinitely"))
+            assert_that(out, not_(contains_string("trigger_only=True")))
 
     def test_status_matching_is_case_insensitive(self):
         """The API serialises these upper-case today, but a lower-cased value
