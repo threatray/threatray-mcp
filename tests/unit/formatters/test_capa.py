@@ -324,6 +324,13 @@ class TestFormatCapaJob(unittest.TestCase):
     def _job(status):
         return {"job_id": "00000000-0000-0000-0000-0000000000aa", "file_hash": DUMMY_SHA256, "job_status": status}
 
+    def test_card_carries_the_job_id_and_file_hash(self):
+        """The id is the whole point of the card — it is the only handle the
+        caller has on the job — so pin that both lines are rendered."""
+        out = format_capa_job(self._job("DONE"))
+        assert_that(out, contains_string("00000000-0000-0000-0000-0000000000aa"))
+        assert_that(out, contains_string(DUMMY_SHA256))
+
     def test_done_points_at_the_result_fetch(self):
         out = format_capa_job(self._job("DONE"))
         assert_that(out, contains_string("DONE"))
