@@ -11,6 +11,7 @@ from threatray_mcp.errors import ThreatrayNotFound
 
 API_BASE = "https://api.threatray.test"
 SHA = "a" * 64
+JOB_ID = "00000000-0000-0000-0000-0000000000aa"
 
 class TestCapaClient(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
@@ -63,3 +64,25 @@ class TestCapaClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["pending"], True)
         self.assertEqual(result["job"]["job_id"], 99)
         self.assertEqual(post_route.call_count, 1)
+
+    @respx.mock
+    async def test_get_job_returns_status(self):
+        """get_job delegates to the poller's job URL and returns the raw payload."""
+        route = respx.get(f"{API_BASE}/v1/capa-analysis/jobs/{JOB_ID}").mock(
+            return_value=httpx.Response(
+                200, json={"job_id": JOB_ID, "file_hash": SHA, "job_status": "PROCESSING"}
+            )
+        )
+        result = await self.client.get_job(JOB_ID)
+        self.assertEqual(result["job_status"], "PROCESSING")
+        self.assertEqual(route.call_count, 1)
+
+    @respx.mock
+    async def test_get_job_404_names_the_id_without_claiming_a_cause(self):
+        """A job-route 404 is ambiguous (unknown id vs route absent for this realm),
+        so the message names the id but must not assert a cause."""
+        respx.get(f"{API_BASE}/v1/capa-analysis/jobs/{JOB_ID}").mock(return_value=httpx.Response(404))
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.client.get_job(JOB_ID)
+        self.assertIn(JOB_ID, str(ctx.exception))
+        self.assertNotIn("Resource not found", str(ctx.exception))

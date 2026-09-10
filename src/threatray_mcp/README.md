@@ -60,6 +60,7 @@ Each section module aligns with the public-API taxonomy ([docs.threatray.com/ref
 | `threatray_retrohunt_functions` | functions | Function-level retrohunt |
 | `threatray_diff_functions` | functions | 1-source-to-N-targets function diff (per-match score/confidence/similarity, via `POST /v1/functions/diff`) |
 | `threatray_get_capa` | capa | CAPA capability analysis (per-function capability matches with rule names) |
+| `threatray_get_capa_job` | capa | Status of one CAPA job by job-id (for the `trigger_only=True` flow) |
 | `threatray_get_ai_analysis` | ai_analysis | AI analysis of a file's functions (with optional `trigger_only` mode that enqueues the job and returns immediately, for slow files) |
 | `threatray_get_ai_analysis_by_id` | ai_analysis | Fetch an AI analysis by its ID |
 | `threatray_list_ai_analyses` | ai_analysis | All AI analyses for a file |

@@ -4,6 +4,23 @@ All notable changes to `threatray-mcp` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-09-09
+
+### Added
+- `threatray_get_capa_job` — poll one CAPA analysis job by its job-id, so the
+  `threatray_get_capa(trigger_only=True)` flow can tell *running* from *failed*
+  instead of reading an ambiguous 404 ([#27]).
+
+### Changed
+- AI-analysis progress now uses the server-owned stage, elapsed time, and nullable
+  remaining-time range rather than presenting a synthetic completion percentage;
+  the same fields are available from `threatray_get_latest_ai_job`.
+- `threatray_get_capa(trigger_only=True)` renders its acknowledgement as a markdown
+  card naming the job-id and the new polling tool, instead of a raw JSON dump.
+  `response_format="json"` is unchanged.
+
+[#27]: https://github.com/threatray/threatray-mcp/issues/27
+
 ## [1.0.3] — 2026-06-09
 
 ### Changed

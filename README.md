@@ -81,7 +81,7 @@ Two transports are supported:
 
 ## Tools
 
-Grouped by [Threatray public API taxonomy](https://docs.threatray.com/reference/overview-api). All 28 tools below; see [`src/threatray_mcp/README.md`](https://github.com/threatray/threatray-mcp/blob/main/src/threatray_mcp/README.md) for per-tool descriptions.
+Grouped by [Threatray public API taxonomy](https://docs.threatray.com/reference/overview-api). All 29 tools below; see [`src/threatray_mcp/README.md`](https://github.com/threatray/threatray-mcp/blob/main/src/threatray_mcp/README.md) for per-tool descriptions.
 
 | Section | Tools |
 |---|---|
@@ -92,7 +92,7 @@ Grouped by [Threatray public API taxonomy](https://docs.threatray.com/reference/
 | Analyses | `threatray_get_analysis`, `threatray_get_osint`, `threatray_list_analyses`, `threatray_list_endpoint_scan_analyses` |
 | Files | `threatray_get_file_metadata`, `threatray_get_strings`, `threatray_download_file` |
 | Functions | `threatray_list_functions`, `threatray_get_code_detections`, `threatray_retrohunt_functions`, `threatray_diff_functions` |
-| CAPA Analysis | `threatray_get_capa` |
+| CAPA Analysis | `threatray_get_capa`, `threatray_get_capa_job` |
 | AI Analysis | `threatray_get_ai_analysis`, `threatray_get_ai_analysis_by_id`, `threatray_list_ai_analyses`, `threatray_get_latest_ai_job` |
 
 All tools accept `response_format=markdown` (default) or `response_format=json`.

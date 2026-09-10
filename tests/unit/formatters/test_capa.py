@@ -5,7 +5,7 @@ import unittest
 from hamcrest import assert_that, contains_string, not_
 
 from tests.dummies import DUMMY_SHA256
-from threatray_mcp.formatters import format_capa_results
+from threatray_mcp.formatters import format_capa_job, format_capa_job_ack, format_capa_results
 from threatray_mcp.formatters.capa import capa_addresses_overflow
 
 
@@ -314,3 +314,96 @@ class TestCapaAddressesOverflow(unittest.TestCase):
     def test_returns_false_on_empty(self):
         assert capa_addresses_overflow({}) is False
         assert capa_addresses_overflow({"capabilities": {"rules": {}}}) is False
+
+
+class TestFormatCapaJob(unittest.TestCase):
+    """The job payload is exactly job_id / file_hash / job_status — no stage, no
+    timestamps — so the formatter must render no ETA and no elapsed time."""
+
+    @staticmethod
+    def _job(status):
+        return {"job_id": "00000000-0000-0000-0000-0000000000aa", "file_hash": DUMMY_SHA256, "job_status": status}
+
+    def test_card_carries_the_job_id_and_file_hash(self):
+        """The id is the whole point of the card — it is the only handle the
+        caller has on the job — so pin that both lines are rendered."""
+        out = format_capa_job(self._job("DONE"))
+        assert_that(out, contains_string("00000000-0000-0000-0000-0000000000aa"))
+        assert_that(out, contains_string(DUMMY_SHA256))
+
+    def test_done_points_at_the_result_fetch(self):
+        out = format_capa_job(self._job("DONE"))
+        assert_that(out, contains_string("DONE"))
+        assert_that(out, contains_string("trigger_if_missing=False"))
+
+    def test_failed_advises_no_retry(self):
+        """A failed job does not resume on its own, so FAILED must not carry a
+        retry suggestion that would loop the agent."""
+        out = format_capa_job(self._job("FAILED"))
+        assert_that(out, contains_string("will not progress"))
+        assert_that(out, not_(contains_string("trigger_only=True")))
+
+    def test_processing_says_poll_and_nothing_else(self):
+        """A status read must not suggest a write. Telling the agent to re-trigger
+        on every PROCESSING poll is a loop, and the payload cannot tell a healthy
+        job from one that is stuck anyway."""
+        out = format_capa_job(self._job("PROCESSING"))
+        assert_that(out, not_(contains_string("trigger_only=True")))
+        # The class docstring claims this formatter renders no ETA; pin it.
+        assert_that(out, not_(contains_string("minute")))
+        # An unbounded "keep polling" is its own trap: a job that never leaves
+        # PROCESSING would be polled forever. Say when to give up instead.
+        assert_that(out, contains_string("stop rather than polling indefinitely"))
+
+    def test_created_and_queued_say_not_started_and_carry_the_same_bound(self):
+        """Every polling branch needs the stop cue, not just PROCESSING: a job
+        sitting in QUEUED leaves an agent in the same unbounded loop."""
+        for status in ("CREATED", "QUEUED"):
+            out = format_capa_job(self._job(status))
+            assert_that(out, contains_string("Not started yet"))
+            assert_that(out, contains_string("stop rather than polling indefinitely"))
+            assert_that(out, not_(contains_string("trigger_only=True")))
+
+    def test_status_matching_is_case_insensitive(self):
+        """The API serialises these upper-case today, but a lower-cased value
+        must not silently fall through to the no-hint branch."""
+        assert_that(format_capa_job(self._job("done")), contains_string("trigger_if_missing=False"))
+
+    def test_unexpected_status_is_shown_verbatim_with_no_guidance(self):
+        """A CAPA job only reaches CREATED/QUEUED/PROCESSING/DONE/FAILED.
+        Anything else is reported as-is rather than guessed at."""
+        out = format_capa_job(self._job("SOMETHING_NEW"))
+        assert_that(out, contains_string("SOMETHING_NEW"))
+        assert_that(out, not_(contains_string("Not started yet")))
+        assert_that(out, not_(contains_string("re-call")))
+        assert_that(out, not_(contains_string("trigger_if_missing=False")))
+
+    def test_missing_status_reports_unknown_and_offers_nothing(self):
+        out = format_capa_job({})
+        assert_that(out, contains_string("CAPA Analysis Job"))
+        assert_that(out, contains_string("unknown"))
+        assert_that(out, not_(contains_string("Not started yet")))
+
+
+class TestFormatCapaJobAck(unittest.TestCase):
+    def test_ack_names_the_job_id_and_the_poll_tool(self):
+        out = format_capa_job_ack({"job_id": "j-1", "file_hash": DUMMY_SHA256, "job_status": "QUEUED"})
+        assert_that(out, contains_string("j-1"))
+        assert_that(out, contains_string("threatray_get_capa_job"))
+
+    def test_heading_claims_neither_a_status_nor_an_action(self):
+        """POST /v1/capa-analysis/jobs is get-or-create, so it can return a job
+        that is already running; the heading must not contradict the status."""
+        out = format_capa_job_ack({"job_id": "j-1", "file_hash": DUMMY_SHA256, "job_status": "PROCESSING"})
+        assert_that(out, contains_string("PROCESSING"))
+        assert_that(out, not_(contains_string("queued")))
+        # The create route is get-or-create, so this call may have started nothing.
+        assert_that(out, not_(contains_string("triggered")))
+
+    def test_ack_maps_null_status_to_unknown(self):
+        out = format_capa_job_ack({"job_id": "j-1", "file_hash": DUMMY_SHA256, "job_status": None})
+        assert_that(out, contains_string("unknown"))
+        assert_that(out, not_(contains_string("None")))
+
+    def test_missing_fields_do_not_raise(self):
+        assert_that(format_capa_job_ack({}), contains_string("unknown"))
