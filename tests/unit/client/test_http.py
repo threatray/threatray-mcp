@@ -55,6 +55,20 @@ class TestHttpClientErrorMapping(unittest.IsolatedAsyncioTestCase):
             await self.http.get("/v1/x")
 
     @respx.mock
+    async def test_404_message_names_the_route(self):
+        """One string for every 404 leaves an agent unable to tell a missing
+        result from a route the realm does not serve. The route is known here."""
+        respx.get(f"{API_BASE}/v1/ai-analysis/jobs/latest").mock(return_value=httpx.Response(404))
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.http.get("/v1/ai-analysis/jobs/latest", params={"file_hash": "a" * 64})
+        message = str(ctx.exception)
+        self.assertIn("GET", message)
+        self.assertIn("/v1/ai-analysis/jobs/latest", message)
+        # Path only — the query carries caller data and the host adds nothing.
+        self.assertNotIn("file_hash", message)
+        self.assertNotIn(API_BASE, message)
+
+    @respx.mock
     async def test_429_maps_to_rate_limit(self):
         respx.get(f"{API_BASE}/v1/x").mock(return_value=httpx.Response(429))
         with self.assertRaises(ThreatrayRateLimitError):

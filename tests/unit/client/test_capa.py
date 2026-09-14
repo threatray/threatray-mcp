@@ -84,5 +84,12 @@ class TestCapaClient(unittest.IsolatedAsyncioTestCase):
         respx.get(f"{API_BASE}/v1/capa-analysis/jobs/{JOB_ID}").mock(return_value=httpx.Response(404))
         with self.assertRaises(ThreatrayNotFound) as ctx:
             await self.client.get_job(JOB_ID)
-        self.assertIn(JOB_ID, str(ctx.exception))
-        self.assertNotIn("Resource not found", str(ctx.exception))
+        message = str(ctx.exception)
+        self.assertIn(JOB_ID, message)
+        self.assertIn("No CAPA job found for id", message)
+        # Assert the remap positively, and that the generic mapper's text is
+        # fully replaced. The old form checked only for the absence of
+        # "Resource not found", which stopped testing its intent the moment that
+        # base string changed — the remap could have been dropped entirely and
+        # this test would still have passed.
+        self.assertNotIn("Not found: GET", message)
