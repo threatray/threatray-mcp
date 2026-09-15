@@ -64,7 +64,10 @@ class TestAiAnalysisAbsenceMessages(unittest.IsolatedAsyncioTestCase):
         )
         # True on a realm that serves no AI route at all: claims nothing about
         # the feature being enabled, and nothing about an analysis having run.
-        self.assertNotIn("enabled", message)
+        # The message names the *not*-enabled case deliberately — it is what a
+        # 404 cannot rule out — so only the positive claim is forbidden.
+        self.assertNotIn("AI analysis is enabled", message)
+        self.assertNotIn("is enabled for your account", message)
         self.assertNotIn("has been run", message)
         self.assertNotIn("has been created", message)
 

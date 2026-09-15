@@ -171,7 +171,10 @@ class AiAnalysisClient:
         except ThreatrayNotFound as e:
             raise ThreatrayNotFound(
                 "No AI analysis job was found for this file. If you only needed to know "
-                "whether one exists, that is the answer. To create one — this starts an "
-                "analysis job — call threatray_get_ai_analysis with trigger_only=true.",
+                "whether one exists, that is the answer; where AI analysis is not enabled "
+                "for your account this call answers the same way, and "
+                "threatray_list_ai_analyses tells the two apart. To create one — this "
+                "starts an analysis job — call threatray_get_ai_analysis with "
+                "trigger_only=true.",
                 e.status_code,
             ) from e

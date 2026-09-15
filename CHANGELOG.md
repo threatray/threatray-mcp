@@ -14,7 +14,9 @@ All notable changes to `threatray-mcp` are documented here. Format follows
 - `threatray_get_latest_ai_job` no longer reports "no job found" as a bare not-found.
   A file with no AI analysis is an ordinary state rather than a fault; the message now
   says so and only then names the call that would create one, noting that doing so
-  starts an analysis job.
+  starts an analysis job. It also says that an account without AI analysis answers the
+  same way, and names `threatray_list_ai_analyses` as the call that tells the two apart —
+  a not-found here cannot distinguish them.
 - `threatray_get_ai_analysis(trigger_if_missing=False)` likewise states the absence and
   names the opt-in creating call, rather than stopping at "no results found".
 - `threatray_get_ai_analysis_by_id` now names the id it could not find and points out

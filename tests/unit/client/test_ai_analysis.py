@@ -340,6 +340,61 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Not found: GET", message)
 
     @respx.mock
+    async def test_absence_messages_are_pinned_in_full(self):
+        """The three absence messages are pinned verbatim, deliberately.
+
+        Every other assertion here is `assertIn`/`assertNotIn`, and no
+        combination of those can catch text *appended* after the asserted
+        phrase. That is not hypothetical: appending "You should do this now, and
+        retry this call until a job appears." to the latest-job message leaves
+        the whole suite green, and that sentence is precisely the
+        retry-a-non-deduplicated-job-creation loop this change exists to remove.
+        The tool description was already pinned for this reason; the messages —
+        the actual subject of the change — were not.
+
+        So: editing any of these three is meant to fail this test. Update the
+        expected text deliberately, having re-checked that each claim is still
+        true of the code, and that nothing appended re-instructs a retry.
+        """
+        aid = "00000000-0000-0000-0000-0000000000ff"
+        respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
+            return_value=httpx.Response(200, json={"results": []})
+        )
+        respx.get(f"{API_BASE}/v1/ai-analysis/jobs/latest").mock(return_value=httpx.Response(404))
+        respx.get(f"{API_BASE}/v1/ai-analysis/results/{aid}").mock(return_value=httpx.Response(404))
+
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.client.get(SHA, trigger_if_missing=False)
+        self.assertEqual(
+            " ".join(str(ctx.exception).split()),
+            "No AI analysis results exist for this file. This call was made with "
+            "trigger_if_missing=false, so none was created. To create one — this starts "
+            "an analysis job — call threatray_get_ai_analysis with trigger_if_missing=true "
+            "and trigger_only=true.",
+        )
+
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.client.get_latest_job(SHA)
+        self.assertEqual(
+            " ".join(str(ctx.exception).split()),
+            "No AI analysis job was found for this file. If you only needed to know "
+            "whether one exists, that is the answer; where AI analysis is not enabled for "
+            "your account this call answers the same way, and threatray_list_ai_analyses "
+            "tells the two apart. To create one — this starts an analysis job — call "
+            "threatray_get_ai_analysis with trigger_only=true.",
+        )
+
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.client.get_result_by_id(aid)
+        self.assertEqual(
+            " ".join(str(ctx.exception).split()),
+            f"No AI analysis result found for id {aid}. Result ids and job ids are both "
+            "UUIDs, so a job id sent here fails exactly as a stale result id does. Result "
+            "ids are listed by threatray_list_ai_analyses; no tool here looks up an AI job "
+            "by id — threatray_get_latest_ai_job takes the file's SHA256.",
+        )
+
+    @respx.mock
     async def test_get_latest_job(self):
         respx.get(f"{API_BASE}/v1/ai-analysis/jobs/latest").mock(
             return_value=httpx.Response(200, json={"job_id": "j1", "job_status": "DONE"})
@@ -375,7 +430,11 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
         )
         # Must stay true on a realm where the route is absent: it may claim
         # nothing about the feature being enabled, nor that an analysis "has run".
-        self.assertNotIn("enabled", message)
+        # Banning the bare word "enabled" would be simpler but wrong — the message
+        # names the not-enabled case on purpose, as the thing a 404 cannot rule
+        # out. What must never appear is the positive claim.
+        self.assertNotIn("AI analysis is enabled", message)
+        self.assertNotIn("is enabled for your account", message)
         self.assertNotIn("has been run", message)
         # A 404 establishes only that nothing was found.
         self.assertNotIn("has been created", message)
