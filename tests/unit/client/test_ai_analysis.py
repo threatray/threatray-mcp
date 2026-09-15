@@ -428,15 +428,36 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
             message.index("starts an analysis job"),
             "the answer must come before the action that creates a job",
         )
-        # Must stay true on a realm where the route is absent: it may claim
-        # nothing about the feature being enabled, nor that an analysis "has run".
-        # Banning the bare word "enabled" would be simpler but wrong — the message
-        # names the not-enabled case on purpose, as the thing a 404 cannot rule
-        # out. What must never appear is the positive claim.
-        self.assertNotIn("AI analysis is enabled", message)
-        self.assertNotIn("is enabled for your account", message)
-        self.assertNotIn("has been run", message)
-        # A 404 establishes only that nothing was found.
-        self.assertNotIn("has been created", message)
+        self._assert_claims_only_what_a_404_establishes(message)
         # And never the bare generic text this replaces.
         self.assertNotIn("Not found: GET", message)
+
+    def _assert_claims_only_what_a_404_establishes(self, message: str) -> None:
+        """A 404 here establishes that nothing was found — nothing more.
+
+        Banning the bare word "enabled" would be simpler, and was what this did
+        first, but it is wrong now: the message names the *not*-enabled case on
+        purpose, as the thing a 404 cannot rule out. Replacing that ban with a
+        list of forbidden spellings was worse — it bans strings, not claims, and
+        "your account has AI analysis enabled, so no job has ever been run"
+        defeats every spelling while asserting both falsehoods.
+
+        So assert the invariant instead: every mention of the feature being
+        enabled must be a negated one, and the message may say nothing at all
+        about an analysis having run or been created. This survives rewording,
+        which is the point — the verbatim pin already catches edits, and this has
+        to keep biting when an editor deliberately updates that pin.
+        """
+        flat = " ".join(message.split())
+        for match in re.finditer(r"\benabled\b", flat):
+            self.assertTrue(
+                flat[: match.start()].rstrip().endswith("not"),
+                f"message claims the feature is enabled, which a 404 cannot establish: {flat!r}",
+            )
+        # Nothing about an analysis having run: a 404 on the job route says
+        # nothing about analyses, and "has ever been run" slips a ban on the
+        # exact phrase "has been run".
+        self.assertIsNone(re.search(r"\brun\b", flat), f"message claims an analysis ran: {flat!r}")
+        self.assertIsNone(
+            re.search(r"\bcreated\b", flat), f"message claims something was created: {flat!r}"
+        )

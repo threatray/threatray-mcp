@@ -4,7 +4,7 @@ All notable changes to `threatray-mcp` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.1] — 2026-09-14
+## [1.1.1] — 2026-09-15
 
 ### Fixed
 - A 404 now names the route that produced it (`Not found: GET /v1/…`) instead of the

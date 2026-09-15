@@ -1,5 +1,6 @@
 """Integration tool tests — full path via fastmcp.Client + respx-mocked upstream."""
 
+import re
 import unittest
 from itertools import pairwise
 
@@ -62,14 +63,28 @@ class TestAiAnalysisAbsenceMessages(unittest.IsolatedAsyncioTestCase):
             message.index("starts an analysis job"),
             "the answer must come before the action that creates a job",
         )
-        # True on a realm that serves no AI route at all: claims nothing about
-        # the feature being enabled, and nothing about an analysis having run.
-        # The message names the *not*-enabled case deliberately — it is what a
-        # 404 cannot rule out — so only the positive claim is forbidden.
-        self.assertNotIn("AI analysis is enabled", message)
-        self.assertNotIn("is enabled for your account", message)
-        self.assertNotIn("has been run", message)
-        self.assertNotIn("has been created", message)
+        # True on a realm that serves no AI route at all. Asserted as an
+        # invariant rather than as forbidden spellings: every mention of the
+        # feature being enabled must be negated, and the message may say nothing
+        # about an analysis having run or been created. A spelling ban is
+        # defeated by "your account has AI analysis enabled, so no job has ever
+        # been run", which asserts both falsehoods.
+        #
+        # The verbatim pin for these messages lives in the unit suite, in one
+        # place. This copy deliberately guards the *claims* instead: two full-text
+        # pins of the same string would have to be updated together, and the
+        # recurring defect in this change has been updating one copy of a claim
+        # and not the other.
+        flat = " ".join(message.split())
+        for match in re.finditer(r"\benabled\b", flat):
+            self.assertTrue(
+                flat[: match.start()].rstrip().endswith("not"),
+                f"message claims the feature is enabled, which a 404 cannot establish: {flat!r}",
+            )
+        self.assertIsNone(re.search(r"\brun\b", flat), f"message claims an analysis ran: {flat!r}")
+        self.assertIsNone(
+            re.search(r"\bcreated\b", flat), f"message claims something was created: {flat!r}"
+        )
 
     @respx.mock
     async def test_no_trigger_absence_names_the_opt_in(self):
@@ -128,9 +143,10 @@ class TestAiAnalysisAbsenceMessages(unittest.IsolatedAsyncioTestCase):
         expected = (
             "Read the latest AI analysis job for a file. **Not an existence check.** "
             "Use this after `threatray_get_ai_analysis(trigger_only=True)` hands back a "
-            "job id: it reports `job_status` (`DONE`, `FAILED`, `UNSUPPORTED`, "
-            "`SKIPPED`), and a processing job carries its stage, start time and a "
-            "nullable server-calculated remaining-time range. It looks up the *latest* "
+            "job id: it reports `job_status`, whose terminal values are `DONE`, "
+            "`FAILED`, `UNSUPPORTED` and `SKIPPED`, and a job still running carries its "
+            "stage, start time and a nullable server-calculated remaining-time range. "
+            "It looks up the *latest* "
             "job for the file, not one job by id, and job creation is not deduplicated "
             "— so where a file has several jobs this need not be the one you started. "
             "A not-found here is ambiguous and stays that way: it reports that no job "
