@@ -77,14 +77,8 @@ class AiAnalysisClient:
             first: dict[str, Any] = results["results"][0]
             return first
         if not trigger_if_missing:
-            # The caller explicitly opted out of creating one, so the creating
-            # option stays available but clearly optional — it is not what they
-            # asked for.
-            # Name BOTH flags. `trigger_if_missing` is checked here, before
-            # `trigger_only` is ever consulted, so telling the caller to add
-            # `trigger_only=true` to the call they just made would return this
-            # exact message again — a loop, which is the failure this change
-            # exists to remove.
+            # Name both flags: this branch is reached before `trigger_only` is
+            # read, so advice naming only that one returns this same message.
             raise ThreatrayNotFound(
                 "No AI analysis results exist for this file. This call was made with "
                 "trigger_if_missing=false, so none was created. To create one — this "
@@ -127,22 +121,10 @@ class AiAnalysisClient:
         try:
             return await self._http.get(f"/v1/ai-analysis/results/{analysis_id}")
         except ThreatrayNotFound as e:
-            # A 404 here is a missing result, not a disabled feature. Job ids and
-            # result ids are both UUIDs, so a job id sent to this route cannot be
-            # rejected client-side and 404s exactly like a stale result id —
-            # worth naming, since it is the confusion this route actually sees.
-            #
-            # States facts rather than issuing an instruction, because two of the
-            # three callers did not choose this id: `get()` passes a `result_id`
-            # taken from a completed job, and the tool re-fetches an `id` taken
-            # from a listing. Telling either to go checking its own input would
-            # send it after a mistake it did not make.
-            #
-            # It also must not point at a lookup the caller cannot perform. The
-            # route exists — `JobPoller.get_job` GETs /v1/ai-analysis/jobs/{id}
-            # while polling — but no *tool* exposes it, unlike CAPA's
-            # `threatray_get_capa_job`. So the accurate statement is about the
-            # tool surface, not the API.
+            # A 404 here is a missing result, not a disabled feature. The message
+            # states facts rather than instructing: two of the three callers pass
+            # an id they were given, not one they chose. `JobPoller.get_job` does
+            # GET a job by id, so the claim is about the tool surface, not the API.
             raise ThreatrayNotFound(
                 f"No AI analysis result found for id {analysis_id}. Result ids and job "
                 "ids are both UUIDs, so a job id sent here fails exactly as a stale "
@@ -153,19 +135,9 @@ class AiAnalysisClient:
             ) from e
 
     async def get_latest_job(self, file_hash: FileHashSha256) -> dict[str, Any]:
-        # A 404 here is ambiguous: a realm with AI disabled has no
-        # /v1/ai-analysis/* route (gateway 404), and an enabled realm with no
-        # job yet also 404s (backend). The two are indistinguishable from the
-        # status code, so the message claims only what a 404 establishes: nothing
-        # was found. Not that the feature is enabled, not that no analysis was
-        # ever run.
-        #
-        # A file with no AI analysis is an ordinary state, not a fault, and the
-        # agents hitting this are asking a yes/no question — so answer that
-        # first. Job creation on this path is NOT deduplicated, so an agent that
-        # retried a message urging it to create one would create a job per
-        # retry — the creating call is named but kept behind an explicit "if
-        # you actually want one".
+        # A 404 here cannot distinguish "no job yet" from a deployment without AI
+        # analysis, so the message claims only that nothing was found. Creation is
+        # not deduplicated, so it is offered conditionally rather than urged.
         try:
             return await self._http.get("/v1/ai-analysis/jobs/latest", params={"file_hash": file_hash})
         except ThreatrayNotFound as e:

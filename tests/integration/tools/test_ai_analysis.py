@@ -54,27 +54,17 @@ class TestAiAnalysisAbsenceMessages(unittest.IsolatedAsyncioTestCase):
         self.assertIn("No AI analysis job was found for this file", message)
         self.assertIn("that is the answer", message)
         self.assertIn("starts an analysis job", message)
-        # Order is the design, not decoration: the yes/no answer must precede the
-        # costly action, or the message reads as "go create one" to the majority
-        # who only wanted the answer. Substring assertions alone are satisfied by
-        # a message that reverses them.
+        # Substring assertions alone pass a message that reverses these two, which
+        # would read as "go create one" to callers who wanted only the answer.
         self.assertLess(
             message.index("that is the answer"),
             message.index("starts an analysis job"),
             "the answer must come before the action that creates a job",
         )
-        # True on a realm that serves no AI route at all. Asserted as an
-        # invariant rather than as forbidden spellings: every mention of the
-        # feature being enabled must be negated, and the message may say nothing
-        # about an analysis having run or been created. A spelling ban is
-        # defeated by "your account has AI analysis enabled, so no job has ever
-        # been run", which asserts both falsehoods.
-        #
-        # The verbatim pin for these messages lives in the unit suite, in one
-        # place. This copy deliberately guards the *claims* instead: two full-text
-        # pins of the same string would have to be updated together, and the
-        # recurring defect in this change has been updating one copy of a claim
-        # and not the other.
+        # An invariant, not a list of forbidden spellings: "your account has AI
+        # analysis enabled, so no job has ever been run" defeats any spelling ban.
+        # The verbatim pin lives once, in the unit suite; this copy guards the
+        # claims, so the two cannot drift apart.
         flat = " ".join(message.split())
         for match in re.finditer(r"\benabled\b", flat):
             self.assertTrue(
@@ -129,17 +119,10 @@ class TestAiAnalysisAbsenceMessages(unittest.IsolatedAsyncioTestCase):
         # Docstrings wrap, so a multi-word claim is not a literal substring of
         # the raw text. Collapse whitespace before asserting phrases.
         flat = " ".join(description.split())
-        # This description is pinned in full, deliberately.
-        #
-        # No `assertIn`/`assertNotIn` pair can catch text *appended* after the
-        # asserted phrase, and every claim in this description is load-bearing:
-        # that it is not an existence check, that it reads the latest job rather
-        # than the caller's, and above all that a not-found here stays ambiguous
-        # and must not be read as proof the feature is on.
-        #
-        # So: changing this description is intended to fail this test. Update the
-        # expected text deliberately, having re-checked that each claim is still
-        # true of the code.
+        # Pinned in full: no assertIn/assertNotIn pair catches text *appended*
+        # after the asserted phrase. Changing this description is meant to fail
+        # here — update the expected text deliberately, having re-checked that
+        # each claim is still true of the code.
         expected = (
             "Read the latest AI analysis job for a file. **Not an existence check.** "
             "Use this after `threatray_get_ai_analysis(trigger_only=True)` hands back a "

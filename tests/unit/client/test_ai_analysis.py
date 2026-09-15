@@ -50,11 +50,8 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
         # The absence is the answer; the creating call is offered but kept
         # optional, because this caller explicitly asked not to create one.
         self.assertIn("No AI analysis results exist for this file", message)
-        # Both flags *and* the conjunction. `trigger_if_missing` is checked
-        # before `trigger_only` is read, so advice naming only the latter — or
-        # offering them as alternatives — sends the caller back into this exact
-        # message. Asserting the two tokens separately passes an "or", which
-        # reintroduces the loop, so pin the phrase.
+        # Pin the conjunction, not the two tokens: asserting them separately
+        # passes an "or", which sends the caller back into this same message.
         self.assertIn("trigger_if_missing=true and trigger_only=true", " ".join(message.split()))
 
     @respx.mock
@@ -325,13 +322,8 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
         message = str(ctx.exception)
         self.assertIn(aid, message)
         self.assertIn("threatray_list_ai_analyses", message)
-        # The load-bearing claim: a job id has no by-id lookup on this client.
-        # Asserting only that "takes the file's SHA256" appears is too weak — a
-        # message that re-instructs `use threatray_get_latest_ai_job` still
-        # contains that phrase while telling the agent to do the impossible.
-        # Pin the complete closing clause. Banning one verb ("use …") passes a
-        # mutant that says "call threatray_get_latest_ai_job with this job id" —
-        # still directing a job id at a file-hash tool, which is the defect.
+        # Pin the whole closing clause. Matching only "takes the file's SHA256"
+        # passes a message that still directs a job id at a file-hash tool.
         self.assertIn(
             "no tool here looks up an AI job by id — threatray_get_latest_ai_job "
             "takes the file's SHA256.",
@@ -343,18 +335,11 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
     async def test_absence_messages_are_pinned_in_full(self):
         """The three absence messages are pinned verbatim, deliberately.
 
-        Every other assertion here is `assertIn`/`assertNotIn`, and no
-        combination of those can catch text *appended* after the asserted
-        phrase. That is not hypothetical: appending "You should do this now, and
-        retry this call until a job appears." to the latest-job message leaves
-        the whole suite green, and that sentence is precisely the
-        retry-a-non-deduplicated-job-creation loop this change exists to remove.
-        The tool description was already pinned for this reason; the messages —
-        the actual subject of the change — were not.
-
-        So: editing any of these three is meant to fail this test. Update the
-        expected text deliberately, having re-checked that each claim is still
-        true of the code, and that nothing appended re-instructs a retry.
+        No assertIn/assertNotIn pair catches text *appended* after the asserted
+        phrase, and appending "retry this call until a job appears." is the exact
+        loop this change removes. Editing any of the three is meant to fail here —
+        update the expected text deliberately, having re-checked that each claim
+        is still true and that nothing appended re-instructs a retry.
         """
         aid = "00000000-0000-0000-0000-0000000000ff"
         respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
@@ -435,18 +420,11 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
     def _assert_claims_only_what_a_404_establishes(self, message: str) -> None:
         """A 404 here establishes that nothing was found — nothing more.
 
-        Banning the bare word "enabled" would be simpler, and was what this did
-        first, but it is wrong now: the message names the *not*-enabled case on
-        purpose, as the thing a 404 cannot rule out. Replacing that ban with a
-        list of forbidden spellings was worse — it bans strings, not claims, and
-        "your account has AI analysis enabled, so no job has ever been run"
-        defeats every spelling while asserting both falsehoods.
-
-        So assert the invariant instead: every mention of the feature being
-        enabled must be a negated one, and the message may say nothing at all
-        about an analysis having run or been created. This survives rewording,
-        which is the point — the verbatim pin already catches edits, and this has
-        to keep biting when an editor deliberately updates that pin.
+        An invariant, not a list of forbidden spellings: "your account has AI
+        analysis enabled, so no job has ever been run" defeats any such list.
+        Surviving rewording is the point — the verbatim pin catches edits, but
+        must be updated when a message legitimately changes, and this has to keep
+        biting across that edit.
         """
         flat = " ".join(message.split())
         for match in re.finditer(r"\benabled\b", flat):

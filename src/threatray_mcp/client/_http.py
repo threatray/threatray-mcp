@@ -37,12 +37,8 @@ def _map_status_error(e: httpx.HTTPStatusError) -> ThreatrayError:  # noqa: PLR0
     if status == 403:
         return ThreatrayForbiddenError("Access denied for this resource.", status)
     if status == 404:
-        # Name what was looked up. A bare "Resource not found." is the same
-        # string for a missing result, a missing job, a route the realm does not
-        # serve and a malformed id, so an agent cannot tell which it hit — and
-        # the route is known right here. Path only, never the full URL: search
-        # and retrohunt put the caller's whole query in the query string, and the
-        # host adds nothing the caller does not already know.
+        # Path, never the full URL: search and retrohunt put the caller's whole
+        # query in the query string.
         return ThreatrayNotFound(f"Not found: {e.request.method} {e.request.url.path}", status)
     if status == 429:
         return ThreatrayRateLimitError("Rate limit exceeded; back off and retry.", status)

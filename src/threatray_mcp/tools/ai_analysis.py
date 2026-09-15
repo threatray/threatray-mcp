@@ -24,12 +24,8 @@ def register(mcp: FastMCP) -> None:
             "title": "Get AI Analysis",
             "readOnlyHint": False,
             "destructiveHint": False,
-            # NOT idempotent: AI-analysis job creation is not deduplicated, so
-            # calling this twice on a file with no result yields two distinct
-            # jobs and two analyses. Advertising idempotency here tells a client
-            # that retrying is free, which is exactly what it must not do.
-            # (CAPA differs — it reuses an existing job for the same file and
-            # rule set — so `threatray_get_capa` keeps the hint.)
+            # Not idempotent: job creation here is not deduplicated, so retrying
+            # is not free. CAPA reuses an existing job and keeps the hint.
             "idempotentHint": False,
             "openWorldHint": True,
         },
