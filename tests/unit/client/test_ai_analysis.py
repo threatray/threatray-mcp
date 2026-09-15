@@ -333,11 +333,13 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
 
     @respx.mock
     async def test_absence_messages_are_pinned_in_full(self):
-        """The three absence messages are pinned verbatim, deliberately.
+        """The AI absence messages are pinned verbatim, deliberately.
+
+        The CAPA one is pinned the same way, in tests/unit/client/test_capa.py.
 
         No assertIn/assertNotIn pair catches text *appended* after the asserted
         phrase, and appending "retry this call until a job appears." is the exact
-        loop this change removes. Editing any of the three is meant to fail here —
+        loop this change removes. Editing any of them is meant to fail here —
         update the expected text deliberately, having re-checked that each claim
         is still true and that nothing appended re-instructs a retry.
         """

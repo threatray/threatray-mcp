@@ -81,6 +81,26 @@ class TestAiAnalysisAbsenceMessages(unittest.IsolatedAsyncioTestCase):
         self.assertIn("No AI analysis results exist for this file", message)
         self.assertIn("trigger_only=true", message)
 
+    @respx.mock
+    async def test_capa_absence_message_survives_the_tool_layer(self):
+        """The CAPA absence message is the fourth one this change adds and the
+        only one that had no tool-layer assertion — so a revert to the bare
+        re-raise passed this suite untouched."""
+        respx.get(f"{API_BASE}/v1/capa-analysis/results/latest").mock(return_value=httpx.Response(404))
+        create = respx.post(f"{API_BASE}/v1/capa-analysis/jobs")
+        mcp = create_server()
+        async with Client(mcp) as client:
+            with self.assertRaises(ToolError) as ctx:
+                await client.call_tool(
+                    "threatray_get_capa",
+                    {"params": {"file_hash": SHA256, "trigger_if_missing": False}},
+                )
+        message = " ".join(str(ctx.exception).split())
+        self.assertIn("No CAPA analysis exists for this file", message)
+        self.assertIn("trigger_if_missing=true", message)
+        self.assertNotIn("Not found: GET", message)
+        self.assertEqual(create.call_count, 0)
+
     async def test_annotations_do_not_advertise_idempotency_for_job_creation(self):
         """AI-analysis job creation is not deduplicated — two identical calls on a
         file with no result create two jobs. Advertising
