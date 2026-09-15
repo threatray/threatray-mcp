@@ -19,6 +19,11 @@ All notable changes to `threatray-mcp` are documented here. Format follows
   a not-found here cannot distinguish them.
 - `threatray_get_ai_analysis(trigger_if_missing=False)` likewise states the absence and
   names the opt-in creating call, rather than stopping at "no results found".
+- `threatray_get_capa(trigger_if_missing=False)` no longer re-raises a bare not-found for a
+  file that simply has no CAPA analysis. It states the absence and names the opt-in, and
+  says that a file which already has a job reuses it rather than starting a second — CAPA
+  job creation, unlike AI analysis, returns the existing job for the same file and rule
+  set.
 - `threatray_get_ai_analysis_by_id` now names the id it could not find and points out
   that job ids and result ids are indistinguishable UUIDs, which is the confusion that
   route actually sees.

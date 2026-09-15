@@ -31,10 +31,47 @@ class TestCapaClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, {"capabilities": {"rules": {}}})
 
     @respx.mock
-    async def test_get_404_without_trigger_raises_not_found(self):
+    async def test_get_404_without_trigger_states_the_absence_and_names_the_opt_in(self):
+        """A file with no CAPA analysis is an ordinary state, not a fault. The
+        message is pinned in full: no assertIn/assertNotIn pair catches text
+        appended after the asserted phrase, and what must never be appended here
+        is a retry instruction.
+        """
         respx.get(f"{API_BASE}/v1/capa-analysis/results/latest").mock(return_value=httpx.Response(404))
-        with self.assertRaises(ThreatrayNotFound):
+        create = respx.post(f"{API_BASE}/v1/capa-analysis/jobs")
+        with self.assertRaises(ThreatrayNotFound) as ctx:
             await self.client.get(SHA, trigger_if_missing=False)
+        self.assertEqual(
+            " ".join(str(ctx.exception).split()),
+            "No CAPA analysis exists for this file. This call was made with "
+            "trigger_if_missing=false, so none was created. To create one, call "
+            "threatray_get_capa with trigger_if_missing=true; a file that already has a "
+            "job reuses it rather than starting a second.",
+        )
+        # The caller opted out, so nothing may be created behind their back.
+        self.assertEqual(create.call_count, 0)
+
+    @respx.mock
+    async def test_capa_opt_out_advice_actually_escapes_the_error(self):
+        """Following the advice must reach a different outcome. `trigger_if_missing`
+        is read before `trigger_only`, exactly as in the AI client, so advice naming
+        only `trigger_only` would return this same message — naming
+        `trigger_if_missing=true` is what actually escapes it."""
+        respx.get(f"{API_BASE}/v1/capa-analysis/results/latest").mock(
+            side_effect=[
+                httpx.Response(404),
+                httpx.Response(200, json={"capabilities": {"rules": {}}}),
+            ]
+        )
+        create = respx.post(f"{API_BASE}/v1/capa-analysis/jobs").mock(
+            return_value=httpx.Response(200, json={"job_id": JOB_ID, "job_status": "DONE"})
+        )
+        respx.get(f"{API_BASE}/v1/capa-analysis/jobs/{JOB_ID}").mock(
+            return_value=httpx.Response(200, json={"job_id": JOB_ID, "job_status": "DONE"})
+        )
+        result = await self.client.get(SHA, trigger_if_missing=True)
+        self.assertEqual(create.call_count, 1)
+        self.assertEqual(result, {"capabilities": {"rules": {}}})
 
     @respx.mock
     async def test_get_404_with_trigger_creates_job_and_fetches(self):
