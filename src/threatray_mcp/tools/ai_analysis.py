@@ -45,9 +45,8 @@ def register(mcp: FastMCP) -> None:
             check completion later with `threatray_get_latest_ai_job` (or list_ai_analyses).
 
         Job creation here is **not** deduplicated: where this call creates a job, calling
-        it again on a file that still has no result creates another one, and another
-        analysis. Retrying it is not free — prefer polling an existing job over
-        re-issuing this call.
+        it again on a file that still has no result creates a second job. Retrying it is
+        not free — prefer polling an existing job over re-issuing this call.
         """
         client = get_client(ctx)
 
@@ -130,7 +129,7 @@ def register(mcp: FastMCP) -> None:
 
         Use this after `threatray_get_ai_analysis(trigger_only=True)` hands back a
         job id: it reports `job_status`, whose terminal values are `DONE`, `FAILED`,
-        `UNSUPPORTED` and `SKIPPED`, and a job still running carries its stage, start
+        `UNSUPPORTED` and `SKIPPED`, and a `PROCESSING` job carries its stage, start
         time and a nullable server-calculated remaining-time range.
 
         It looks up the *latest* job for the file, not one job by id, and job creation

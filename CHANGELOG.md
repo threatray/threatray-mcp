@@ -26,11 +26,16 @@ All notable changes to `threatray-mcp` are documented here. Format follows
   existence check, and names `threatray_list_ai_analyses` (an empty list rather than an
   error, where AI analysis is enabled for the account) and
   `threatray_get_file_metadata` as the tools that are.
-- `threatray_get_ai_analysis` no longer advertises `idempotentHint: true`. AI-analysis
-  job creation is not deduplicated, so two identical calls on a file with no result
-  create two jobs and two analyses — the annotation told clients that retrying was free
-  when it is not. `threatray_get_capa` keeps the hint: its job creation *is* a
+- `threatray_get_ai_analysis` no longer advertises `idempotentHint: true`, and its own
+  description now says that creating a job here is not deduplicated: two identical calls
+  on a file with no result create two jobs. The annotation told clients that retrying was
+  free when it is not, and the tool that does the creating was the one place that never
+  said otherwise. `threatray_get_capa` keeps the hint: its job creation *is* a
   get-or-create.
+- `threatray_get_latest_ai_job`'s description names `DONE`, `FAILED`, `UNSUPPORTED` and
+  `SKIPPED` as the *terminal* `job_status` values rather than as the whole set, and
+  attributes the stage, start time and remaining-time range to a `PROCESSING` job, which
+  is what actually carries them.
 
 Apart from that one annotation, these are message and documentation changes only. No
 request behaviour, tool signature or response schema changed, and `response_format="json"`
