@@ -136,15 +136,9 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
 
     @respx.mock
     async def test_completion_without_a_result_id_fails_rather_than_guessing(self):
-        """A job reports DONE together with the result it produced, so it cannot
-        complete without one. This asserts what happens if that is ever violated:
-        fail, rather than fall back to the file-hash listing.
-
-        The listing holds every analysis for the file, so its first entry need not
-        be the one this call produced — substituting it would turn a visible fault
-        into a confident wrong answer, which for analysis output is worse. It is
-        also what issue #26 proposed, and this is the test that pins the refusal.
-        """
+        """Pins the refusal. A completed job with no result reference fails rather
+        than falling back to the listing, whose first entry need not be the analysis
+        this call produced. Adding that fallback is what #26 proposed."""
         listing = respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
             side_effect=[
                 httpx.Response(200, json={"results": []}),
