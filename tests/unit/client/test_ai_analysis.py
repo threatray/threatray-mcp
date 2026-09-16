@@ -11,7 +11,7 @@ import respx
 
 from threatray_mcp.client import AiAnalysisClient
 from threatray_mcp.client._http import HttpClient
-from threatray_mcp.errors import ThreatrayFeatureUnavailable, ThreatrayNotFound
+from threatray_mcp.errors import ThreatrayFeatureUnavailable, ThreatrayJobFailed, ThreatrayNotFound
 from threatray_mcp.models import AiAnalysisInput
 
 API_BASE = "https://api.threatray.test"
@@ -135,11 +135,21 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result_route.call_count, 1)
 
     @respx.mock
-    async def test_trigger_flow_falls_back_to_listing_for_legacy_job_shape(self):
-        respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
+    async def test_completion_without_a_result_id_fails_rather_than_guessing(self):
+        """A job reports DONE together with the result it produced, so it cannot
+        complete without one. This asserts what happens if that is ever violated:
+        fail, rather than fall back to the file-hash listing.
+
+        The listing holds every analysis for the file, so its first entry need not
+        be the one this call produced — substituting it would turn a visible fault
+        into a confident wrong answer, which for analysis output is worse. It is
+        also what issue #26 proposed, and this is the test that pins the refusal.
+        """
+        listing = respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
             side_effect=[
                 httpx.Response(200, json={"results": []}),
-                httpx.Response(200, json={"results": [{"id": "fresh"}]}),
+                # Present and plausible, so the test fails if anything reaches for it.
+                httpx.Response(200, json={"results": [{"id": "some-other-analysis"}]}),
             ]
         )
         respx.post(f"{API_BASE}/v1/ai-analysis/jobs").mock(
@@ -149,17 +159,22 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
             return_value=httpx.Response(200, json={"job_id": "j1", "job_status": "DONE"})
         )
 
-        result = await self.client.get(SHA, trigger_if_missing=True, max_wait_seconds=30)
+        with self.assertRaises(ThreatrayJobFailed) as ctx:
+            await self.client.get(SHA, trigger_if_missing=True, max_wait_seconds=30)
 
-        self.assertEqual(result["id"], "fresh")
+        self.assertIn("no results were returned", str(ctx.exception))
+        # Only the initial existence check may have hit the listing — never a
+        # second, post-completion read.
+        self.assertEqual(listing.call_count, 1)
 
     @respx.mock
     async def test_trigger_flow_reports_strict_progress_across_stage_lifecycle(self):
+        result_id = "00000000-0000-0000-0000-00000000beef"
         respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
-            side_effect=[
-                httpx.Response(200, json={"results": []}),
-                httpx.Response(200, json={"results": [{"id": "fresh"}]}),
-            ]
+            return_value=httpx.Response(200, json={"results": []})
+        )
+        respx.get(f"{API_BASE}/v1/ai-analysis/results/{result_id}").mock(
+            return_value=httpx.Response(200, json={"id": result_id, "assessment": "fresh"})
         )
         respx.post(f"{API_BASE}/v1/ai-analysis/jobs").mock(
             return_value=httpx.Response(200, json={"job_id": "j1", "job_status": "QUEUED"})
@@ -191,7 +206,7 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
                     200,
                     json={"job_id": "j1", "job_status": "PROCESSING", "stage": "SYNTHESIZING"},
                 ),
-                httpx.Response(200, json={"job_id": "j1", "job_status": "DONE"}),
+                httpx.Response(200, json={"job_id": "j1", "job_status": "DONE", "result_id": result_id}),
             ]
         )
         updates: list[tuple[float, str]] = []
