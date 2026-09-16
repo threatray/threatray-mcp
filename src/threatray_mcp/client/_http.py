@@ -37,7 +37,9 @@ def _map_status_error(e: httpx.HTTPStatusError) -> ThreatrayError:  # noqa: PLR0
     if status == 403:
         return ThreatrayForbiddenError("Access denied for this resource.", status)
     if status == 404:
-        return ThreatrayNotFound("Resource not found.", status)
+        # Path, never the full URL: search and retrohunt put the caller's whole
+        # query in the query string.
+        return ThreatrayNotFound(f"Not found: {e.request.method} {e.request.url.path}", status)
     if status == 429:
         return ThreatrayRateLimitError("Rate limit exceeded; back off and retry.", status)
     if 500 <= status < 600:

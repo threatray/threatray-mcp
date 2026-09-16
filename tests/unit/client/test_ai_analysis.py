@@ -2,6 +2,7 @@
 get-by-id and get-latest-job."""
 
 import json
+import re
 import unittest
 from itertools import pairwise
 
@@ -11,6 +12,7 @@ import respx
 from threatray_mcp.client import AiAnalysisClient
 from threatray_mcp.client._http import HttpClient
 from threatray_mcp.errors import ThreatrayFeatureUnavailable, ThreatrayNotFound
+from threatray_mcp.models import AiAnalysisInput
 
 API_BASE = "https://api.threatray.test"
 SHA = "f" * 64
@@ -42,8 +44,58 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
     @respx.mock
     async def test_get_empty_results_without_trigger_raises_not_found(self):
         respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(return_value=httpx.Response(200, json={"results": []}))
-        with self.assertRaises(ThreatrayNotFound):
+        with self.assertRaises(ThreatrayNotFound) as ctx:
             await self.client.get(SHA, trigger_if_missing=False)
+        message = str(ctx.exception)
+        # The absence is the answer; the creating call is offered but kept
+        # optional, because this caller explicitly asked not to create one.
+        self.assertIn("No AI analysis results exist for this file", message)
+        # Pin the conjunction, not the two tokens: asserting them separately
+        # passes an "or", which sends the caller back into this same message.
+        self.assertIn("trigger_if_missing=true and trigger_only=true", " ".join(message.split()))
+
+    @respx.mock
+    async def test_absence_messages_only_name_parameters_that_exist(self):
+        """The messages hard-code tool parameter names. Nothing otherwise ties
+        them to the real fields, so renaming one would leave a message telling
+        agents to pass a parameter that no longer exists — and every other test
+        here would still pass. This is that link."""
+        fields = set(AiAnalysisInput.model_fields)
+        respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(return_value=httpx.Response(200, json={"results": []}))
+        respx.get(f"{API_BASE}/v1/ai-analysis/jobs/latest").mock(return_value=httpx.Response(404))
+
+        messages = []
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.client.get(SHA, trigger_if_missing=False)
+        messages.append(str(ctx.exception))
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.client.get_latest_job(SHA)
+        messages.append(str(ctx.exception))
+
+        named = {name for m in messages for name in re.findall(r"\b(\w+)=\w+", m)}
+        self.assertTrue(named, "expected the messages to name at least one parameter")
+        self.assertTrue(
+            named <= fields,
+            f"messages name parameters that are not fields of AiAnalysisInput: {named - fields}",
+        )
+
+    @respx.mock
+    async def test_no_trigger_advice_actually_escapes_the_error(self):
+        """Following the message must reach a different outcome. Adding only
+        `trigger_only=True` does not: `trigger_if_missing` is evaluated first, so
+        the call returns the identical error and never posts a job."""
+        respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(return_value=httpx.Response(200, json={"results": []}))
+        post = respx.post(f"{API_BASE}/v1/ai-analysis/jobs").mock(
+            return_value=httpx.Response(200, json={"job_id": "j1", "job_status": "QUEUED"})
+        )
+        with self.assertRaises(ThreatrayNotFound):
+            await self.client.get(SHA, trigger_if_missing=False, trigger_only=True)
+        self.assertEqual(post.call_count, 0, "trigger_only alone must not create a job")
+
+        # With both flags, as the message instructs, the job is created.
+        result = await self.client.get(SHA, trigger_if_missing=True, trigger_only=True)
+        self.assertEqual(post.call_count, 1)
+        self.assertTrue(result.get("pending"))
 
     @respx.mock
     async def test_list_results_404_maps_to_feature_unavailable(self):
@@ -257,6 +309,79 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["id"], aid)
 
     @respx.mock
+    async def test_get_result_by_id_404_names_the_id_and_the_job_confusion(self):
+        """Job ids and result ids are both UUIDs, so a job id sent here 404s
+        exactly like a stale result id. The message must name the id and the
+        confusion — and must not tell an agent to go checking input it never
+        chose, because `get()` and the tool both pass ids they obtained
+        themselves."""
+        aid = "00000000-0000-0000-0000-0000000000ff"
+        respx.get(f"{API_BASE}/v1/ai-analysis/results/{aid}").mock(return_value=httpx.Response(404))
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.client.get_result_by_id(aid)
+        message = str(ctx.exception)
+        self.assertIn(aid, message)
+        self.assertIn("threatray_list_ai_analyses", message)
+        # Pin the whole closing clause. Matching only "takes the file's SHA256"
+        # passes a message that still directs a job id at a file-hash tool.
+        self.assertIn(
+            "no tool here looks up an AI job by id — threatray_get_latest_ai_job "
+            "takes the file's SHA256.",
+            " ".join(message.split()),
+        )
+        self.assertNotIn("Not found: GET", message)
+
+    @respx.mock
+    async def test_absence_messages_are_pinned_in_full(self):
+        """The AI absence messages are pinned verbatim, deliberately.
+
+        The CAPA one is pinned the same way, in tests/unit/client/test_capa.py.
+
+        No assertIn/assertNotIn pair catches text *appended* after the asserted
+        phrase, and appending "retry this call until a job appears." is the exact
+        loop this change removes. Editing any of them is meant to fail here —
+        update the expected text deliberately, having re-checked that each claim
+        is still true and that nothing appended re-instructs a retry.
+        """
+        aid = "00000000-0000-0000-0000-0000000000ff"
+        respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
+            return_value=httpx.Response(200, json={"results": []})
+        )
+        respx.get(f"{API_BASE}/v1/ai-analysis/jobs/latest").mock(return_value=httpx.Response(404))
+        respx.get(f"{API_BASE}/v1/ai-analysis/results/{aid}").mock(return_value=httpx.Response(404))
+
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.client.get(SHA, trigger_if_missing=False)
+        self.assertEqual(
+            " ".join(str(ctx.exception).split()),
+            "No AI analysis results exist for this file. This call was made with "
+            "trigger_if_missing=false, so none was created. To create one — this starts "
+            "an analysis job — call threatray_get_ai_analysis with trigger_if_missing=true "
+            "and trigger_only=true.",
+        )
+
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.client.get_latest_job(SHA)
+        self.assertEqual(
+            " ".join(str(ctx.exception).split()),
+            "No AI analysis job was found for this file. If you only needed to know "
+            "whether one exists, that is the answer; where AI analysis is not enabled for "
+            "your account this call answers the same way, and threatray_list_ai_analyses "
+            "tells the two apart. To create one — this starts an analysis job — call "
+            "threatray_get_ai_analysis with trigger_only=true.",
+        )
+
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.client.get_result_by_id(aid)
+        self.assertEqual(
+            " ".join(str(ctx.exception).split()),
+            f"No AI analysis result found for id {aid}. Result ids and job ids are both "
+            "UUIDs, so a job id sent here fails exactly as a stale result id does. Result "
+            "ids are listed by threatray_list_ai_analyses; no tool here looks up an AI job "
+            "by id — threatray_get_latest_ai_job takes the file's SHA256.",
+        )
+
+    @respx.mock
     async def test_get_latest_job(self):
         respx.get(f"{API_BASE}/v1/ai-analysis/jobs/latest").mock(
             return_value=httpx.Response(200, json={"job_id": "j1", "job_status": "DONE"})
@@ -270,5 +395,42 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
         # no-job-yet, so it stays ThreatrayNotFound rather than claiming the
         # feature is unavailable.
         respx.get(f"{API_BASE}/v1/ai-analysis/jobs/latest").mock(return_value=httpx.Response(404))
-        with self.assertRaises(ThreatrayNotFound):
+        with self.assertRaises(ThreatrayNotFound) as ctx:
             await self.client.get_latest_job(SHA)
+        message = str(ctx.exception)
+        # Answers the yes/no question first — most callers of this route wanted
+        # only that, and job creation here is not deduplicated, so a retried
+        # instruction to create one would create a job per retry.
+        self.assertIn("No AI analysis job was found for this file", message)
+        self.assertIn("that is the answer", message)
+        # The creating call is named but explicitly conditional, and says that it
+        # starts a job.
+        self.assertIn("trigger_only=true", message)
+        self.assertIn("starts an analysis job", message)
+        # Ordering is the design: answer first, action second. Substring
+        # assertions alone are satisfied by a message that reverses them, which
+        # would read as "go create one" to the callers who wanted a yes/no.
+        self.assertLess(
+            message.index("that is the answer"),
+            message.index("starts an analysis job"),
+            "the answer must come before the action that creates a job",
+        )
+        self._assert_carries_the_ambiguity_caveat(message)
+        # And never the bare generic text this replaces.
+        self.assertNotIn("Not found: GET", message)
+
+    def _assert_carries_the_ambiguity_caveat(self, message: str) -> None:
+        """The message must keep saying that a not-found here is ambiguous.
+
+        This is a tripwire, not a proof. Two earlier attempts tried to forbid the
+        *claim* that the feature is enabled — first by banning a word, then by
+        requiring every "enabled" to be negated. Both were defeated by synonym
+        ("not disabled") or by an appended sentence, and the second also rejected
+        truthful rewrites like "not, in fact, enabled". A guard that fails a
+        correct message is one the next editor deletes, so it is gone.
+
+        What is left is the positive requirement, which is what actually matters:
+        the caveat has to survive. The verbatim pin is what catches edits; this
+        keeps biting after that pin is deliberately updated.
+        """
+        self.assertIn("is not enabled", " ".join(message.split()))

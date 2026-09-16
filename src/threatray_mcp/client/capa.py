@@ -44,9 +44,18 @@ class CapaClient:
             if progress_callback:
                 await progress_callback(0.1, "Checking for existing CAPA analysis...")
             return await self._http.get("/v1/capa-analysis/results/latest", params={"file_hash": file_hash})
-        except ThreatrayNotFound:
+        except ThreatrayNotFound as e:
             if not trigger_if_missing:
-                raise
+                # Unlike AI analysis, creating a CAPA job is a get-or-create for
+                # the same file and rule set, so the creating call can be named
+                # without qualification.
+                raise ThreatrayNotFound(
+                    "No CAPA analysis exists for this file. This call was made with "
+                    "trigger_if_missing=false, so none was created. To create one, call "
+                    "threatray_get_capa with trigger_if_missing=true; a file that already "
+                    "has a job reuses it rather than starting a second.",
+                    e.status_code,
+                ) from e
             if progress_callback:
                 await progress_callback(0.2, "No existing analysis, creating CAPA job...")
             job = await self._create_job(file_hash)

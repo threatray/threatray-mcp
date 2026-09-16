@@ -24,7 +24,9 @@ def register(mcp: FastMCP) -> None:
             "title": "Get AI Analysis",
             "readOnlyHint": False,
             "destructiveHint": False,
-            "idempotentHint": True,
+            # Not idempotent: job creation here is not deduplicated, so retrying
+            # is not free. CAPA reuses an existing job and keeps the hint.
+            "idempotentHint": False,
             "openWorldHint": True,
         },
     )
@@ -41,6 +43,10 @@ def register(mcp: FastMCP) -> None:
             `max_wait_seconds` (default 600s, max 3600s).
           - `trigger_only=True`: enqueue the job and return immediately with the job-id;
             check completion later with `threatray_get_latest_ai_job` (or list_ai_analyses).
+
+        Job creation here is **not** deduplicated: where this call creates a job, calling
+        it again on a file that still has no result creates a second job. Retrying it is
+        not free — prefer polling an existing job over re-issuing this call.
         """
         client = get_client(ctx)
 
@@ -119,13 +125,23 @@ def register(mcp: FastMCP) -> None:
         annotations={"title": "Get Latest AI Analysis Job", **_READONLY},  # type: ignore[arg-type]
     )
     async def threatray_get_latest_ai_job(ctx: Context, params: AiLatestJobInput) -> str:
-        """Get the most recent AI analysis job for a file (status + progress).
+        """Read the latest AI analysis job for a file. **Not an existence check.**
 
-        Useful when `threatray_get_ai_analysis` was previously called with
-        `trigger_only=True`: the kickoff returned just the job id, and this tool lets
-        you poll later for completion (`job_status` of `DONE`, `FAILED`, `UNSUPPORTED`,
-        or `SKIPPED`). Processing jobs include their current stage, start time, and a
-        nullable server-calculated remaining-time range.
+        Use this after `threatray_get_ai_analysis(trigger_only=True)` hands back a
+        job id: it reports `job_status`, whose terminal values are `DONE`, `FAILED`,
+        `UNSUPPORTED` and `SKIPPED`, and a `PROCESSING` job carries its stage, start
+        time and a nullable server-calculated remaining-time range.
+
+        It looks up the *latest* job for the file, not one job by id, and job creation
+        is not deduplicated — so where a file has several jobs this need not be the
+        one you started.
+
+        A not-found here is ambiguous and stays that way: it reports that no job was
+        found, which on a deployment without AI analysis is indistinguishable from the
+        feature being absent. To ask whether a file *has* an analysis, call
+        `threatray_list_ai_analyses` — where AI analysis is enabled for your account
+        it answers with an empty list rather than an error. To confirm the file itself
+        exists, use `threatray_get_file_metadata`.
         """
         client = get_client(ctx)
         result = await client.ai_analysis.get_latest_job(FileHashSha256(params.file_hash))

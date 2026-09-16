@@ -77,7 +77,14 @@ class AiAnalysisClient:
             first: dict[str, Any] = results["results"][0]
             return first
         if not trigger_if_missing:
-            raise ThreatrayNotFound("No AI analysis results found for this file.")
+            # Name both flags: this branch is reached before `trigger_only` is
+            # read, so advice naming only that one returns this same message.
+            raise ThreatrayNotFound(
+                "No AI analysis results exist for this file. This call was made with "
+                "trigger_if_missing=false, so none was created. To create one — this "
+                "starts an analysis job — call threatray_get_ai_analysis with "
+                "trigger_if_missing=true and trigger_only=true."
+            )
 
         await report_progress("No existing analysis, creating AI analysis job...")
         job = await self._create_job(file_hash)
@@ -113,16 +120,33 @@ class AiAnalysisClient:
     async def get_result_by_id(self, analysis_id: AiAnalysisId) -> dict[str, Any]:
         try:
             return await self._http.get(f"/v1/ai-analysis/results/{analysis_id}")
-        except ThreatrayNotFound:
-            # /results/{id} 404 is a missing result, not a disabled feature. The
-            # generic mapping in _http already raises ThreatrayNotFound for us.
-            raise
+        except ThreatrayNotFound as e:
+            # A 404 here is a missing result, not a disabled feature. The message
+            # states facts rather than instructing: two of the three callers pass
+            # an id they were given, not one they chose. `JobPoller.get_job` does
+            # GET a job by id, so the claim is about the tool surface, not the API.
+            raise ThreatrayNotFound(
+                f"No AI analysis result found for id {analysis_id}. Result ids and job "
+                "ids are both UUIDs, so a job id sent here fails exactly as a stale "
+                "result id does. Result ids are listed by threatray_list_ai_analyses; "
+                "no tool here looks up an AI job by id — threatray_get_latest_ai_job "
+                "takes the file's SHA256.",
+                e.status_code,
+            ) from e
 
     async def get_latest_job(self, file_hash: FileHashSha256) -> dict[str, Any]:
-        # A 404 here is ambiguous: a realm with AI disabled has no
-        # /v1/ai-analysis/* route (gateway 404), and an enabled realm with no
-        # job yet also 404s (backend). The two are indistinguishable from the
-        # status code, and "no job yet" is the dominant case when polling for
-        # the latest job — so surface ThreatrayNotFound (the default _http
-        # mapping) rather than overclaiming the feature is off.
-        return await self._http.get("/v1/ai-analysis/jobs/latest", params={"file_hash": file_hash})
+        # A 404 here cannot distinguish "no job yet" from a deployment without AI
+        # analysis, so the message claims only that nothing was found. Creation is
+        # not deduplicated, so it is offered conditionally rather than urged.
+        try:
+            return await self._http.get("/v1/ai-analysis/jobs/latest", params={"file_hash": file_hash})
+        except ThreatrayNotFound as e:
+            raise ThreatrayNotFound(
+                "No AI analysis job was found for this file. If you only needed to know "
+                "whether one exists, that is the answer; where AI analysis is not enabled "
+                "for your account this call answers the same way, and "
+                "threatray_list_ai_analyses tells the two apart. To create one — this "
+                "starts an analysis job — call threatray_get_ai_analysis with "
+                "trigger_only=true.",
+                e.status_code,
+            ) from e

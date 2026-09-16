@@ -4,6 +4,52 @@ All notable changes to `threatray-mcp` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-09-16
+
+### Fixed
+- A 404 now names the route that produced it (`Not found: GET /v1/…`) instead of the
+  single string `Resource not found.` shared by every endpoint. The exception type and
+  status code are unchanged, and call sites that substitute their own message — CAPA's
+  job lookup, and the AI-analysis feature-unavailable mapping — are unaffected ([#26]).
+- `threatray_get_latest_ai_job` no longer reports "no job found" as a bare not-found.
+  A file with no AI analysis is an ordinary state rather than a fault; the message now
+  says so and only then names the call that would create one, noting that doing so
+  starts an analysis job. It also says that an account without AI analysis answers the
+  same way, and names `threatray_list_ai_analyses` as the call that tells the two apart —
+  a not-found here cannot distinguish them.
+- `threatray_get_ai_analysis(trigger_if_missing=False)` likewise states the absence and
+  names the opt-in creating call, rather than stopping at "no results found".
+- `threatray_get_capa(trigger_if_missing=False)` no longer re-raises a bare not-found for a
+  file that simply has no CAPA analysis. It states the absence and names the opt-in, and
+  says that a file which already has a job reuses it rather than starting a second — CAPA
+  job creation, unlike AI analysis, returns the existing job for the same file and rule
+  set.
+- `threatray_get_ai_analysis_by_id` now names the id it could not find and points out
+  that job ids and result ids are indistinguishable UUIDs, which is the confusion that
+  route actually sees.
+- `threatray_get_latest_ai_job`'s description says plainly that it is **not** an
+  existence check, and names `threatray_list_ai_analyses` (an empty list rather than an
+  error, where AI analysis is enabled for the account) and
+  `threatray_get_file_metadata` as the tools that are.
+- `threatray_get_ai_analysis` no longer advertises `idempotentHint: true`, and its own
+  description now says that creating a job here is not deduplicated: two identical calls
+  on a file with no result create two jobs. The annotation told clients that retrying was
+  free when it is not, and the tool that does the creating was the one place that never
+  said otherwise. `threatray_get_capa` keeps the hint: its job creation *is* a
+  get-or-create.
+- `threatray_get_latest_ai_job`'s description names `DONE`, `FAILED`, `UNSUPPORTED` and
+  `SKIPPED` as the *terminal* `job_status` values rather than as the whole set, and
+  attributes the stage, start time and remaining-time range to a `PROCESSING` job, which
+  is what actually carries them.
+
+Apart from that one annotation, these are message and documentation changes only. No
+request behaviour, tool signature or response schema changed, and `response_format="json"`
+output is untouched.
+
+This addresses the opaque-error half of [#26] — the bare `Resource not found.` that reads
+as if the sample or the feature is missing. The listing fallback that report also asks for
+is deliberately not included; that discussion continues on the issue.
+
 ## [1.1.0] — 2026-09-09
 
 ### Added
@@ -19,6 +65,7 @@ All notable changes to `threatray-mcp` are documented here. Format follows
   card naming the job-id and the new polling tool, instead of a raw JSON dump.
   `response_format="json"` is unchanged.
 
+[#26]: https://github.com/threatray/threatray-mcp/issues/26
 [#27]: https://github.com/threatray/threatray-mcp/issues/27
 
 ## [1.0.3] — 2026-06-09

@@ -55,6 +55,36 @@ class TestHttpClientErrorMapping(unittest.IsolatedAsyncioTestCase):
             await self.http.get("/v1/x")
 
     @respx.mock
+    async def test_404_message_names_the_route(self):
+        """One string for every 404 leaves an agent unable to tell a missing
+        result from a route the realm does not serve. The route is known here."""
+        respx.get(f"{API_BASE}/v1/ai-analysis/jobs/latest").mock(return_value=httpx.Response(404))
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.http.get("/v1/ai-analysis/jobs/latest", params={"file_hash": "a" * 64})
+        message = str(ctx.exception)
+        self.assertIn("GET", message)
+        self.assertIn("/v1/ai-analysis/jobs/latest", message)
+        # Path only — the query carries caller data and the host adds nothing.
+        self.assertNotIn("file_hash", message)
+        self.assertNotIn(API_BASE, message)
+        # Renaming the text must not quietly drop the status the callers read.
+        self.assertEqual(ctx.exception.status_code, 404)
+
+    @respx.mock
+    async def test_404_message_names_the_method_for_non_get_routes(self):
+        """The method is interpolated from the request, so a route reached by
+        POST must name POST. Asserting only on a GET route leaves a mapper that
+        hardcodes "GET" passing — and job creation and submissions are POSTs."""
+        respx.post(f"{API_BASE}/v1/ai-analysis/jobs").mock(return_value=httpx.Response(404))
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.http.post("/v1/ai-analysis/jobs", {"file_hash": "a" * 64})
+        message = str(ctx.exception)
+        self.assertIn("POST", message)
+        self.assertNotIn("GET", message)
+        self.assertIn("/v1/ai-analysis/jobs", message)
+        self.assertEqual(ctx.exception.status_code, 404)
+
+    @respx.mock
     async def test_429_maps_to_rate_limit(self):
         respx.get(f"{API_BASE}/v1/x").mock(return_value=httpx.Response(429))
         with self.assertRaises(ThreatrayRateLimitError):
