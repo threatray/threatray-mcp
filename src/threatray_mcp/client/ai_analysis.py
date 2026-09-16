@@ -105,8 +105,10 @@ class AiAnalysisClient:
         await report_progress("Fetching results...")
         if result_id := completed_job.get("result_id"):
             return await self.get_result_by_id(AiAnalysisId(str(result_id)))
-        # No listing fallback here: it holds every analysis for the file, so its
-        # first entry need not be the one this call produced.
+        # A completed job carries the result it produced, so this is a contract
+        # violation rather than a case to recover from. No listing fallback: it
+        # holds every analysis for the file, so its first entry need not be the
+        # one this call produced.
         raise ThreatrayJobFailed("AI analysis completed but no results were returned.")
 
     async def list_results(self, file_hash: FileHashSha256) -> dict[str, Any]:
