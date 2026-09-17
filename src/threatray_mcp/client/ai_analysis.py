@@ -104,13 +104,13 @@ class AiAnalysisClient:
         )
         await report_progress("Fetching results...")
         if result_id := completed_job.get("result_id"):
+            # Deliberately unguarded — see #26. The listing below cannot stand in
+            # for one specific result; it holds every analysis for the file.
             return await self.get_result_by_id(AiAnalysisId(str(result_id)))
-        # This job was created by this call, so a current instance completed it
-        # and it carries the result it produced — a contract violation here, not
-        # a case to recover from. Not a general rule: a job read back by
-        # threatray_get_latest_ai_job may predate the result reference entirely.
-        # No listing fallback either: it holds every analysis for the file, so
-        # its first entry need not be the one this call produced.
+        results = await self._http.get("/v1/ai-analysis/results", params={"file_hash": file_hash})
+        if results.get("results"):
+            final: dict[str, Any] = results["results"][0]
+            return final
         raise ThreatrayJobFailed("AI analysis completed but no results were returned.")
 
     async def list_results(self, file_hash: FileHashSha256) -> dict[str, Any]:
