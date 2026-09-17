@@ -135,6 +135,45 @@ class TestAiAnalysisClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result_route.call_count, 1)
 
     @respx.mock
+    async def test_by_id_not_found_propagates_instead_of_falling_back(self):
+        """#26 asked for this 404 to fall through to the file-hash listing.
+
+        It must not. The listing holds every analysis for the file, so it cannot
+        stand in for one specific result — falling through would return a
+        different analysis as though it were the one just produced, which is a
+        confident wrong answer in place of a visible fault. The fallback below
+        is reached only when the job carries no id at all; that is a different
+        case, and it is not what this pins.
+        """
+        result_id = "00000000-0000-0000-0000-000000000002"
+        listing = respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
+            side_effect=[
+                httpx.Response(200, json={"results": []}),
+                # Plausible and wrong: whatever falls back would return this.
+                httpx.Response(200, json={"results": [{"id": "some-other-analysis"}]}),
+            ]
+        )
+        respx.post(f"{API_BASE}/v1/ai-analysis/jobs").mock(
+            return_value=httpx.Response(200, json={"job_id": "j1", "job_status": "QUEUED"})
+        )
+        respx.get(f"{API_BASE}/v1/ai-analysis/jobs/j1").mock(
+            return_value=httpx.Response(
+                200, json={"job_id": "j1", "job_status": "DONE", "result_id": result_id}
+            )
+        )
+        by_id = respx.get(f"{API_BASE}/v1/ai-analysis/results/{result_id}").mock(
+            return_value=httpx.Response(404)
+        )
+
+        with self.assertRaises(ThreatrayNotFound) as ctx:
+            await self.client.get(SHA, trigger_if_missing=True, max_wait_seconds=30)
+
+        self.assertIn(result_id, str(ctx.exception))
+        self.assertEqual(by_id.call_count, 1)
+        # Only the initial existence check — never a second, post-failure read.
+        self.assertEqual(listing.call_count, 1)
+
+    @respx.mock
     async def test_trigger_flow_falls_back_to_listing_for_legacy_job_shape(self):
         respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
             side_effect=[

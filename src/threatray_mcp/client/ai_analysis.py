@@ -104,6 +104,9 @@ class AiAnalysisClient:
         )
         await report_progress("Fetching results...")
         if result_id := completed_job.get("result_id"):
+            # A 404 here must raise, not fall through to the listing below: that
+            # fetches all the file's analyses and takes the first, which need not
+            # be the one this job produced. Declined in threatray/threatray-mcp#26.
             return await self.get_result_by_id(AiAnalysisId(str(result_id)))
         results = await self._http.get("/v1/ai-analysis/results", params={"file_hash": file_hash})
         if results.get("results"):
