@@ -52,14 +52,13 @@ class TestFunctionsClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(route.calls[0].request.url.params["hash"], SHA256)
 
     @respx.mock
-    async def test_run_retrohunt_single_uid_duplicates_internally(self):
+    async def test_run_retrohunt_single_uid_is_sent_once(self):
         route = respx.get(f"{API_BASE}/v1/retrohunt/functions").mock(
             return_value=httpx.Response(200, json={"analyses": []})
         )
         await self.client.run_retrohunt(["uid-1"], threshold=0.5, scope=SearchScope.BOTH)
-        # The single-uid case duplicates the UID to satisfy a backend constraint.
         uids = route.calls[0].request.url.params.get_list("uids")
-        self.assertEqual(uids, ["uid-1", "uid-1"])
+        self.assertEqual(uids, ["uid-1"])
 
     @respx.mock
     async def test_run_retrohunt_threshold_is_passed_through_verbatim(self):

@@ -51,10 +51,6 @@ class FunctionsClient:
         threshold: float = 0.0,
         scope: SearchScope = SearchScope.BOTH,
     ) -> dict[str, Any]:
-        # The single-uid case is duplicated to satisfy a backend constraint;
-        # the threshold ratio is preserved.
-        if len(function_uids) == 1:
-            function_uids = [function_uids[0], function_uids[0]]
         params: dict[str, Any] = {
             "uids": function_uids,
             "threshold": threshold,

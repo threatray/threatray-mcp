@@ -101,6 +101,22 @@ class TestRetrohuntFunctionsTool(unittest.IsolatedAsyncioTestCase):
         )
 
     @respx.mock
+    async def test_retrohunt_sends_a_single_uid_once(self):
+        route = respx.get(f"{API_BASE}/v1/retrohunt/functions").mock(
+            return_value=httpx.Response(
+                200,
+                json={"functions": [], "code_regions": [], "samples": [], "analyses": []},
+            )
+        )
+        mcp = create_server()
+        async with Client(mcp) as client:
+            await client.call_tool(
+                "threatray_retrohunt_functions",
+                {"params": {"function_uids": ["CFF.111"]}},
+            )
+        self.assertEqual(route.calls[0].request.url.params.get_list("uids"), ["CFF.111"])
+
+    @respx.mock
     async def test_retrohunt_uses_function_style_formatter(self):
         """Regression for the swap PR9630-era bug where the tool was wired to
         `format_retrohunt_results` (sample-style) instead of
