@@ -198,12 +198,18 @@ services:
     profiles:
       - lint
 
-  type-check-3-13: &type-check-template
+  type-check-3-14: &type-check-template
     <<: *threatray-mcp-3-14
     command: /app/venv/bin/python -m mypy --cache-dir /tmp/.mypy_cache /app/src/threatray_mcp
     profiles:
-      - type-check-3-13
+      - type-check-3-14
       - type-check-latest
+
+  type-check-3-13:
+    <<: *threatray-mcp-3-13
+    command: /app/venv/bin/python -m mypy --cache-dir /tmp/.mypy_cache /app/src/threatray_mcp
+    profiles:
+      - type-check-3-13
 
   type-check-3-12:
     <<: *threatray-mcp-3-12

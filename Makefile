@@ -55,7 +55,7 @@ vulture-whitelist:
 	docker compose -f docker-compose.yml --profile lint down --remove-orphans
 
 # ─── Type check ─────────────────────────────────────────────────────────────
-type-check: type-check-3-11 type-check-3-12 type-check-3-13
+type-check: type-check-3-11 type-check-3-12 type-check-3-13 type-check-3-14
 
 type-check-%:
 	docker compose -f docker-compose.yml --profile $@ build
