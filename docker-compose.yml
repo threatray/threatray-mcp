@@ -13,7 +13,7 @@ services:
       context: .
       target: runtime
       args:
-        VERSION: "3.13"
+        VERSION: "3.14"
     environment:
       THREATRAY_TRANSPORT: http
       THREATRAY_HOST: 0.0.0.0
@@ -27,7 +27,44 @@ services:
     profiles:
       - http
 
-  # ─── Python 3.13 (latest supported) ──────────────────────────────────────
+  # ─── Python 3.14 (latest supported) ──────────────────────────────────────
+  threatray-mcp-3-14: &threatray-mcp-3-14
+    user: "${UID:-1000}:${GID:-1000}"
+    build:
+      context: .
+      target: base
+      args:
+        VERSION: "3.14"
+    # Mount only the project files we need — mounting `.:/app` would clobber
+    # the image's prebuilt venv at /app/venv with the host's (empty) one.
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./vulture_whitelist.py:/app/vulture_whitelist.py
+    environment:
+      PYTHONPATH: /app/src
+      HOME: /tmp
+      THREATRAY_API_KEY: ${THREATRAY_API_KEY:-}
+      THREATRAY_API_URL: ${THREATRAY_API_URL:-}
+    profiles:
+      - standard
+
+  threatray-mcp-unit-tests-3-14:
+    <<: *threatray-mcp-3-14
+    command: /app/venv/bin/python tests/unit/run_tests.py
+    profiles:
+      - unit-tests-3-14
+      - unit-tests-latest
+
+  threatray-mcp-int-tests-3-14:
+    <<: *threatray-mcp-3-14
+    command: /app/venv/bin/python tests/integration/run_tests.py
+    profiles:
+      - int-tests-3-14
+      - int-tests-latest
+
+  # ─── Python 3.13 ──────────────────────────────────────
   threatray-mcp-3-13: &threatray-mcp-3-13
     user: "${UID:-1000}:${GID:-1000}"
     build:
@@ -55,14 +92,12 @@ services:
     command: /app/venv/bin/python tests/unit/run_tests.py
     profiles:
       - unit-tests-3-13
-      - unit-tests-latest
 
   threatray-mcp-int-tests-3-13:
     <<: *threatray-mcp-3-13
     command: /app/venv/bin/python tests/integration/run_tests.py
     profiles:
       - int-tests-3-13
-      - int-tests-latest
 
   # ─── Python 3.12 ────────────────────────────────────────────────────────
   threatray-mcp-3-12: &threatray-mcp-3-12
@@ -134,37 +169,37 @@ services:
   # Caches go to /tmp because the lint targets mount the project read-only-ish
   # (just src/, tests/, pyproject.toml) — /app itself isn't writable.
   ruff:
-    <<: *threatray-mcp-3-13
+    <<: *threatray-mcp-3-14
     command: /app/venv/bin/python -m ruff check --cache-dir /tmp/.ruff_cache /app
     profiles:
       - lint
 
   ruff-fix:
-    <<: *threatray-mcp-3-13
+    <<: *threatray-mcp-3-14
     command: /app/venv/bin/python -m ruff check --cache-dir /tmp/.ruff_cache /app --fix
     profiles:
       - lint-fix
 
   ruff-format:
-    <<: *threatray-mcp-3-13
+    <<: *threatray-mcp-3-14
     command: /app/venv/bin/python -m ruff format --cache-dir /tmp/.ruff_cache /app
     profiles:
       - lint-fix
 
   vulture:
-    <<: *threatray-mcp-3-13
+    <<: *threatray-mcp-3-14
     command: /app/venv/bin/python -m vulture /app/src/threatray_mcp /app/tests vulture_whitelist.py
     profiles:
       - lint
 
   vulture-whitelist:
-    <<: *threatray-mcp-3-13
+    <<: *threatray-mcp-3-14
     command: /app/venv/bin/python -m vulture /app/src/threatray_mcp /app/tests --make-whitelist
     profiles:
       - lint
 
   type-check-3-13: &type-check-template
-    <<: *threatray-mcp-3-13
+    <<: *threatray-mcp-3-14
     command: /app/venv/bin/python -m mypy --cache-dir /tmp/.mypy_cache /app/src/threatray_mcp
     profiles:
       - type-check-3-13

@@ -14,7 +14,7 @@ _default:
 # ─── Unit tests ─────────────────────────────────────────────────────────────
 # `make unit-tests` runs all supported Python versions; `make unit-tests-3-13`
 # runs only one.
-unit-tests: unit-tests-3-11 unit-tests-3-12 unit-tests-3-13
+unit-tests: unit-tests-3-11 unit-tests-3-12 unit-tests-3-13 unit-tests-3-14
 
 unit-tests-%:
 	docker compose -f docker-compose.yml --profile $@ build
@@ -23,7 +23,7 @@ unit-tests-%:
 	docker compose -f docker-compose.yml --profile $@ down --remove-orphans
 
 # ─── Integration tests ──────────────────────────────────────────────────────
-int-tests: int-tests-3-11 int-tests-3-12 int-tests-3-13
+int-tests: int-tests-3-11 int-tests-3-12 int-tests-3-13 int-tests-3-14
 
 int-tests-%:
 	docker compose -f docker-compose.yml --profile $@ build --pull
