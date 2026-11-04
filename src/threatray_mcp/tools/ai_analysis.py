@@ -36,7 +36,11 @@ def register(mcp: FastMCP) -> None:
         Analyses the file's disassembled functions with an AI model and returns:
         per-function natural-language summaries describing what each function does,
         the capabilities the model extracted from those functions, and an overall
-        sample-level summary plus verdict.
+        sample-level summary plus verdict. Supplied analysis warnings are displayed
+        separately from the model assessment; coverage truncation is shown when known.
+        Missing or empty warnings do not establish complete coverage. An unknown
+        verdict is inconclusive; truncated=false only rules out function-limit
+        truncation, not other coverage limitations.
 
         Behavior modes (set via `trigger_only`):
           - `trigger_only=False` (default): block until the job finishes, up to
@@ -94,7 +98,8 @@ def register(mcp: FastMCP) -> None:
         Returns one summary row per AI analysis run for the sample identified by
         the given hash (status, creation timestamp, AI analysis ID). Use
         `threatray_get_ai_analysis_by_id` to fetch the full result of a specific
-        run.
+        run. Coverage truncation is shown as true, false, or unknown; warnings are
+        available from the full result.
         """
         client = get_client(ctx)
         result = await client.ai_analysis.list_results(FileHashSha256(params.file_hash))
@@ -112,7 +117,11 @@ def register(mcp: FastMCP) -> None:
         Use this when you already have the AI analysis ID — e.g. from a previous
         `threatray_list_ai_analyses` call — and want the full AI analysis result
         (per-function summaries, extracted capabilities, sample-level summary and
-        verdict) without re-listing.
+        verdict) without re-listing. Supplied warnings are displayed separately from
+        the model assessment. Missing or empty warnings do not establish complete
+        coverage; null or omitted coverage truncation remains unknown. An unknown
+        verdict is inconclusive; truncated=false only rules out function-limit
+        truncation, not other coverage limitations.
         """
         client = get_client(ctx)
         result = await client.ai_analysis.get_result_by_id(AiAnalysisId(str(params.analysis_id)))

@@ -1,6 +1,8 @@
 """Integration tool tests — full path via fastmcp.Client + respx-mocked upstream."""
 
+import json
 import unittest
+from copy import deepcopy
 from itertools import pairwise
 
 import httpx
@@ -189,3 +191,97 @@ class TestAiAnalysisProgress(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(progress_values, [1.0, 2.0, 3.0, 4.0, 5.0])
         self.assertTrue(all(current < following for current, following in pairwise(progress_values)))
         self.assertTrue(any(progress == 4.0 and message == "AI analysis: Complete" for progress, _, message in updates))
+
+
+class TestAiAnalysisWarningContract(unittest.IsolatedAsyncioTestCase):
+    @respx.mock
+    async def test_both_retrieval_tools_preserve_full_result(self) -> None:
+        result_id = "00000000-0000-0000-0000-000000000001"
+        for fields in (
+            {
+                "warnings": ["Limited.", "Other.", "Limited.", "<b>literal</b>\n```"],
+                "function_coverage": {"truncated": True},
+            },
+            {"warnings": [], "function_coverage": {"truncated": False}},
+            {"function_coverage": {"truncated": None}},
+            {},
+        ):
+            data = {"id": result_id, "file_hash": SHA256, "verdict": "unknown", "assessment": "Looks benign.", **fields}
+            before = deepcopy(data)
+            listing = respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(
+                return_value=httpx.Response(200, json={"results": [{"id": result_id, "file_hash": SHA256}]})
+            )
+            detail = respx.get(f"{API_BASE}/v1/ai-analysis/results/{result_id}").mock(
+                return_value=httpx.Response(200, json=data)
+            )
+            listing_before = listing.call_count
+            detail_before = detail.call_count
+            async with Client(create_server()) as client:
+                for name, params in (
+                    ("threatray_get_ai_analysis", {"file_hash": SHA256, "trigger_if_missing": False}),
+                    ("threatray_get_ai_analysis_by_id", {"analysis_id": result_id}),
+                ):
+                    for output in ("markdown", "json"):
+                        response = await client.call_tool(name, {"params": {**params, "response_format": output}})
+                        text = response.content[0].text
+                        if output == "json":
+                            self.assertEqual(json.loads(text), before)
+                        else:
+                            self.assertIn("**Verdict**: unknown", text)
+                            self.assertIn("Looks benign.", text)
+                            self.assertIn("**Coverage truncated**:", text)
+                            if fields.get("warnings"):
+                                self.assertEqual(text.count("Limited."), 2)
+                                self.assertLess(text.index("Analysis warnings"), text.index("### Summary"))
+            self.assertEqual(data, before)
+            self.assertEqual(listing.call_count - listing_before, 2)
+            self.assertEqual(detail.call_count - detail_before, 4)
+            self.assertTrue(all(call.request.method == "GET" for call in respx.calls))
+
+    @respx.mock
+    async def test_list_coverage_without_detail_fetch(self) -> None:
+        data = {
+            "results": [
+                {"id": str(index), **fields}
+                for index, fields in enumerate(
+                    (
+                        {"function_coverage": {"truncated": True}},
+                        {"function_coverage": {"truncated": False}},
+                        {"function_coverage": {"truncated": None}},
+                        {},
+                    )
+                )
+            ]
+        }
+        route = respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(return_value=httpx.Response(200, json=data))
+        async with Client(create_server()) as client:
+            for output in ("markdown", "json"):
+                response = await client.call_tool(
+                    "threatray_list_ai_analyses", {"params": {"file_hash": SHA256, "response_format": output}}
+                )
+                text = response.content[0].text
+                if output == "json":
+                    self.assertEqual(json.loads(text), data)
+                else:
+                    for label in ("true", "false", "unknown (null)", "unknown (not supplied)"):
+                        self.assertIn(f"| {label} |", text)
+                    self.assertNotIn("Analysis warnings", text)
+        self.assertEqual(route.call_count, 2)
+        self.assertEqual(len(respx.calls), 2)
+
+    @respx.mock
+    async def test_malformed_warnings_are_errors_only_in_markdown(self) -> None:
+        result_id = "00000000-0000-0000-0000-000000000001"
+        for warnings in (None, "warning", ["valid", 1]):
+            data = {"id": result_id, "assessment": "Looks benign.", "warnings": warnings}
+            respx.get(f"{API_BASE}/v1/ai-analysis/results/{result_id}").mock(
+                return_value=httpx.Response(200, json=data)
+            )
+            async with Client(create_server()) as client:
+                params = {"analysis_id": result_id}
+                with self.assertRaisesRegex(ToolError, "warnings.*array of strings"):
+                    await client.call_tool("threatray_get_ai_analysis_by_id", {"params": params})
+                response = await client.call_tool(
+                    "threatray_get_ai_analysis_by_id", {"params": {**params, "response_format": "json"}}
+                )
+                self.assertEqual(json.loads(response.content[0].text), data)
