@@ -19,10 +19,10 @@ def _fmt_addr(addr: Any) -> str:
 
 
 def _format_truncation(data: dict[str, Any]) -> str:
-    data = data.get("function_coverage") or {}
-    if "truncated" not in data:
+    coverage: dict[str, Any] = data.get("function_coverage") or {}
+    if "truncated" not in coverage:
         return "unknown (not supplied)"
-    value = data["truncated"]
+    value: Any = coverage["truncated"]
     if value is None:
         return "unknown (null)"
     if value is True:
@@ -35,20 +35,20 @@ def _format_truncation(data: dict[str, Any]) -> str:
 def _format_warnings(data: dict[str, Any]) -> list[str]:
     if "warnings" not in data:
         return []
-    warnings = data["warnings"]
+    warnings: Any = data["warnings"]
     if not isinstance(warnings, list) or any(not isinstance(warning, str) for warning in warnings):
         raise ValueError("Invalid AI analysis warnings: expected an array of strings")
     if not warnings:
         return []
     lines: list[str] = ["\n### Analysis warnings"]
     for index, warning in enumerate(warnings, start=1):
-        literal = "".join(
+        literal: str = "".join(
             f"\\u{ord(char):04x}"
             if (unicodedata.category(char).startswith("C") and char not in "\n\t") or char in "\u2028\u2029"
             else char
             for char in warning
         )
-        fence = "`" * max(3, max((len(run) + 1 for run in re.findall(r"`+", literal)), default=0))
+        fence: str = "`" * max(3, max((len(run) + 1 for run in re.findall(r"`+", literal)), default=0))
         lines.extend([f"\nWarning {index}:", f"{fence}text", literal, fence])
     return lines
 

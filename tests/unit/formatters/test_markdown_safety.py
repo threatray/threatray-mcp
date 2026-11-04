@@ -200,7 +200,6 @@ class TestListInjection(unittest.TestCase):
         assert_that(len(_data_rows(out, "INJECTED")), equal_to(0))
 
 
-
 class TestAiWarningLiteralDisplay(unittest.TestCase):
     def test_warning_cannot_escape_literal_block(self) -> None:
         warning = (
