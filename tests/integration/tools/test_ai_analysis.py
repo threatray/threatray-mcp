@@ -199,7 +199,15 @@ class TestAiAnalysisWarningContract(unittest.IsolatedAsyncioTestCase):
         result_id = "00000000-0000-0000-0000-000000000001"
         for fields in (
             {
-                "warnings": ["Limited.", "Other.", "Limited.", "<b>literal</b>\n```"],
+                "warnings": [
+                    "Limited.",
+                    "Other.",
+                    "Limited.",
+                    "<b>literal</b>\n```",
+                    "\u202e",
+                    r"\u{202e}",
+                    chr(0xF7F9F) + "f",
+                ],
                 "function_coverage": {"truncated": True},
             },
             {"warnings": [], "function_coverage": {"truncated": False}},
@@ -279,9 +287,38 @@ class TestAiAnalysisWarningContract(unittest.IsolatedAsyncioTestCase):
             )
             async with Client(create_server()) as client:
                 params = {"analysis_id": result_id}
-                with self.assertRaisesRegex(ToolError, "warnings.*array of strings"):
+                with self.assertRaisesRegex(ToolError, "warnings.*array of strings.*response_format=json"):
                     await client.call_tool("threatray_get_ai_analysis_by_id", {"params": params})
                 response = await client.call_tool(
                     "threatray_get_ai_analysis_by_id", {"params": {**params, "response_format": "json"}}
                 )
                 self.assertEqual(json.loads(response.content[0].text), data)
+
+    @respx.mock
+    async def test_malformed_truncation_guides_json_for_both_results_and_list(self) -> None:
+        result_id = "00000000-0000-0000-0000-000000000001"
+        for truncated in ("yes", 0, [], {}):
+            data = {
+                "id": result_id,
+                "file_hash": SHA256,
+                "assessment": "Looks benign.",
+                "function_coverage": {"truncated": truncated},
+            }
+            listing = {
+                "results": [{"id": result_id, "file_hash": SHA256, "function_coverage": {"truncated": truncated}}]
+            }
+            respx.get(f"{API_BASE}/v1/ai-analysis/results").mock(return_value=httpx.Response(200, json=listing))
+            respx.get(f"{API_BASE}/v1/ai-analysis/results/{result_id}").mock(
+                return_value=httpx.Response(200, json=data)
+            )
+            async with Client(create_server()) as client:
+                for name, params, expected in (
+                    ("threatray_get_ai_analysis", {"file_hash": SHA256, "trigger_if_missing": False}, data),
+                    ("threatray_get_ai_analysis_by_id", {"analysis_id": result_id}, data),
+                    ("threatray_list_ai_analyses", {"file_hash": SHA256}, listing),
+                ):
+                    with self.assertRaisesRegex(ToolError, "truncated.*boolean or null.*response_format=json"):
+                        await client.call_tool(name, {"params": params})
+                    response = await client.call_tool(name, {"params": {**params, "response_format": "json"}})
+                    self.assertEqual(json.loads(response.content[0].text), expected)
+            self.assertTrue(all(call.request.method == "GET" for call in respx.calls))

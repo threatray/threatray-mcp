@@ -213,8 +213,16 @@ class TestAiWarningLiteralDisplay(unittest.TestCase):
     def test_controls_are_visible_inside_warning_only(self) -> None:
         warning = "before\u202eafter\x00\r\u2028\u2029\nnext\tline"
         result = format_ai_analysis({"assessment": "Actual assessment", "warnings": [warning]})
-        self.assertIn(r"before\u202eafter\u0000\u000d\u2028\u2029" + "\nnext\tline", result)
+        self.assertIn(r"before\u{202e}after\u{0000}\u{000d}\u{2028}\u{2029}" + "\nnext\tline", result)
         self.assertNotIn("\u202e", result)
+
+    def test_control_display_distinguishes_literal_escapes_and_supplementary_codepoints(self) -> None:
+        warning = "\u202e " + r"\u202e \u{202e}" + " " + chr(0xF7F9F) + "f\n```"
+        data = {"assessment": "Actual assessment", "warnings": [warning]}
+        result = format_ai_analysis(data)
+        self.assertIn(r"\u{202e} \\u202e \\u{202e} \u{f7f9f}f" + "\n```", result)
+        self.assertIn("````text\n", result)
+        self.assertEqual(data, {"assessment": "Actual assessment", "warnings": [warning]})
 
 
 if __name__ == "__main__":

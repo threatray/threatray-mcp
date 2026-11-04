@@ -29,7 +29,10 @@ def _format_truncation(data: dict[str, Any]) -> str:
         return "true"
     if value is False:
         return "false"
-    raise ValueError("Invalid AI analysis truncated: expected a boolean or null")
+    raise ValueError(
+        "Invalid AI analysis truncated: expected a boolean or null; "
+        "use response_format=json to inspect the unmodified result"
+    )
 
 
 def _format_warnings(data: dict[str, Any]) -> list[str]:
@@ -37,13 +40,18 @@ def _format_warnings(data: dict[str, Any]) -> list[str]:
         return []
     warnings: Any = data["warnings"]
     if not isinstance(warnings, list) or any(not isinstance(warning, str) for warning in warnings):
-        raise ValueError("Invalid AI analysis warnings: expected an array of strings")
+        raise ValueError(
+            "Invalid AI analysis warnings: expected an array of strings; "
+            "use response_format=json to inspect the unmodified result"
+        )
     if not warnings:
         return []
     lines: list[str] = ["\n### Analysis warnings"]
     for index, warning in enumerate(warnings, start=1):
         literal: str = "".join(
-            f"\\u{ord(char):04x}"
+            "\\\\"
+            if char == "\\"
+            else f"\\u{{{ord(char):04x}}}"
             if (unicodedata.category(char).startswith("C") and char not in "\n\t") or char in "\u2028\u2029"
             else char
             for char in warning
