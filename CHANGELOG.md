@@ -4,6 +4,23 @@ All notable changes to `threatray-mcp` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-11-04
+
+### Added
+- AI analysis Markdown displays every supplied warning in order, separately from the
+  model assessment, with literal formatting, escaped backslashes and visible Unicode
+  control characters.
+- Full AI results and analysis listings display supplied coverage truncation, with
+  distinct unknown labels for null and omitted values. Missing or empty warnings do
+  not establish complete coverage. JSON responses retain the original API payload.
+
+### Changed
+- Support FastMCP 4 alongside FastMCP 3, and Python 3.14 alongside Python 3.11–3.13.
+
+### Fixed
+- Single-function retrohunts send the function ID once and preserve the supplied
+  threshold ([#32]). This requires a server version that accepts a single `uids` value.
+
 ## [1.1.1] — 2026-09-16
 
 ### Fixed
@@ -67,6 +84,7 @@ is deliberately not included; that discussion continues on the issue.
 
 [#26]: https://github.com/threatray/threatray-mcp/issues/26
 [#27]: https://github.com/threatray/threatray-mcp/issues/27
+[#32]: https://github.com/threatray/threatray-mcp/pull/32
 
 ## [1.0.3] — 2026-06-09
 

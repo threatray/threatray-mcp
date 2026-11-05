@@ -2,6 +2,7 @@
 job-status, list entry, full detail) plus the listing endpoint."""
 
 import unittest
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 
 from hamcrest import assert_that, contains_string, is_not
@@ -148,3 +149,50 @@ class TestZeroFunctionsAnalysed(unittest.TestCase):
         )
         assert_that(result, contains_string("0 analysed"))
         assert_that(result, is_not(contains_string("? analysed")))
+
+
+class TestAiAnalysisWarnings(unittest.TestCase):
+    def test_warnings_preserve_order_duplicates_and_assessment(self) -> None:
+        for verdict in ("unknown", "malicious", "suspicious", "benign"):
+            data = {
+                "verdict": verdict,
+                "assessment": "Looks benign.",
+                "warnings": ["Limited.", "Other.", "Limited.", ""],
+                "function_coverage": {"truncated": True},
+                "functions_analyzed": 0,
+                "functions_decompiled": 0,
+            }
+            before = deepcopy(data)
+            result = format_ai_analysis(data)
+            self.assertEqual(data, before)
+            self.assertIn(f"**Verdict**: {verdict}", result)
+            self.assertIn("**Coverage truncated**: true", result)
+            self.assertIn("### Summary (LLM-generated)\nLooks benign.", result)
+            self.assertEqual(result.count("Limited."), 2)
+            self.assertLess(result.index("Limited."), result.index("Other."))
+            self.assertLess(result.index("Warning 4:"), result.index("### Summary"))
+            self.assertIn("Warning 4:\n```text\n\n```", result)
+
+    def test_coverage_states_in_full_and_list(self) -> None:
+        for fields, label in (
+            ({"function_coverage": {"truncated": True}}, "true"),
+            ({"function_coverage": {"truncated": False}}, "false"),
+            ({"function_coverage": {"truncated": None}}, "unknown (null)"),
+            ({}, "unknown (not supplied)"),
+        ):
+            with self.subTest(fields=fields):
+                detail = format_ai_analysis({"assessment": "text", **fields})
+                listing = format_ai_analysis_list({"results": [{"id": "result", **fields}]})
+                self.assertIn(f"**Coverage truncated**: {label}", detail)
+                self.assertIn(f"| {label} |", listing)
+                self.assertNotIn("Analysis warnings", listing)
+                self.assertNotIn("Analysis warnings", detail)
+
+    def test_absent_and_empty_warnings_do_not_invent_warning(self) -> None:
+        for fields in ({}, {"warnings": []}):
+            self.assertNotIn("Analysis warnings", format_ai_analysis({"assessment": "text", **fields}))
+
+    def test_present_malformed_warnings_fail_clearly(self) -> None:
+        for warnings in (None, "warning", ["valid", 1], {}, [None]):
+            with self.subTest(warnings=warnings), self.assertRaisesRegex(ValueError, "warnings.*array of strings"):
+                format_ai_analysis({"assessment": "text", "warnings": warnings})

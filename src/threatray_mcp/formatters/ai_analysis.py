@@ -1,5 +1,7 @@
 """AI Analysis section formatters."""
 
+import re
+import unicodedata
 from typing import Any
 
 from ..ai_analysis_status import (
@@ -14,6 +16,49 @@ from ._helpers import format_timestamp
 
 def _fmt_addr(addr: Any) -> str:
     return f"0x{addr:x}" if isinstance(addr, int) else str(addr or "-")
+
+
+def _format_truncation(data: dict[str, Any]) -> str:
+    coverage: dict[str, Any] = data.get("function_coverage") or {}
+    if "truncated" not in coverage:
+        return "unknown (not supplied)"
+    value: Any = coverage["truncated"]
+    if value is None:
+        return "unknown (null)"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    raise ValueError(
+        "Invalid AI analysis truncated: expected a boolean or null; "
+        "use response_format=json to inspect the unmodified result"
+    )
+
+
+def _format_warnings(data: dict[str, Any]) -> list[str]:
+    if "warnings" not in data:
+        return []
+    warnings: Any = data["warnings"]
+    if not isinstance(warnings, list) or any(not isinstance(warning, str) for warning in warnings):
+        raise ValueError(
+            "Invalid AI analysis warnings: expected an array of strings; "
+            "use response_format=json to inspect the unmodified result"
+        )
+    if not warnings:
+        return []
+    lines: list[str] = ["\n### Analysis warnings"]
+    for index, warning in enumerate(warnings, start=1):
+        literal: str = "".join(
+            "\\\\"
+            if char == "\\"
+            else f"\\u{{{ord(char):04x}}}"
+            if (unicodedata.category(char).startswith("C") and char not in "\n\t") or char in "\u2028\u2029"
+            else char
+            for char in warning
+        )
+        fence: str = "`" * max(3, max((len(run) + 1 for run in re.findall(r"`+", literal)), default=0))
+        lines.extend([f"\nWarning {index}:", f"{fence}text", literal, fence])
+    return lines
 
 
 def format_ai_analysis(data: dict[str, Any]) -> str:
@@ -79,6 +124,9 @@ def format_ai_analysis(data: dict[str, Any]) -> str:
             f"/ {decompiled if decompiled is not None else '?'} decompiled"
         )
 
+    lines.append(f"- **Coverage truncated**: {_format_truncation(data)}")
+    lines.extend(_format_warnings(data))
+
     if assessment := data.get("assessment"):
         lines.append("\n### Summary (LLM-generated)")
         lines.append(assessment)
@@ -139,14 +187,14 @@ def format_ai_analysis_list(data: dict[str, Any]) -> str:
     if not results:
         return "\n".join(lines) + "\n*No AI analysis has been run for this file yet.*\n"
 
-    lines.append("| Analysis ID | Verdict | Functions analysed | Created |")
-    lines.append("|-------------|---------|-------------------:|---------|")
+    lines.append("| Analysis ID | Verdict | Functions analysed | Coverage truncated | Created |")
+    lines.append("|-------------|---------|-------------------:|--------------------|---------|")
     for r in results:
         verdict = r.get("verdict") or "-"
         if isinstance(verdict, dict):
             verdict = verdict.get("label") or verdict.get("value") or "-"
         lines.append(
             f"| `{r.get('id', '?')}` | {verdict} | {r.get('functions_analyzed', '?')} "
-            f"| {format_timestamp(r.get('created_at'))} |"
+            f"| {_format_truncation(r)} | {format_timestamp(r.get('created_at'))} |"
         )
     return "\n".join(lines) + "\n"
